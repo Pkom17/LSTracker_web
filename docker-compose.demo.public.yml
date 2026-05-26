@@ -1,0 +1,22 @@
+# =====================================================================
+# Override DEMO — expose le port 9201 publiquement (sans nginx)
+#
+# Usage TEMPORAIRE pendant la phase de validation demo, avant d'avoir
+# migré apache2 → nginx. Permet d'accéder à la demo via :
+#   http://<ip-publique>:9201
+#
+# Lance :
+#   docker compose --env-file .env.demo \
+#                  -f docker-compose.demo.yml \
+#                  -f docker-compose.demo.public.yml \
+#                  up -d
+#
+# Une fois nginx en place : ne plus utiliser ce fichier (le compose principal
+# bind sur 127.0.0.1 et nginx fait le reverse proxy en HTTPS).
+# =====================================================================
+
+services:
+  tracker_app:
+    ports:
+      # Override : retire le bind 127.0.0.1 → expose publiquement
+      - "${DEMO_PORT:-9201}:9200"
