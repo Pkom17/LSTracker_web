@@ -1,15 +1,17 @@
 # =====================================================================
-# Build & publication de l'image LSTracker sur GitHub Container Registry.
+# Build & publication de l'image LSTracker + bundle de déploiement.
 #
 # Déclencheurs :
-#   - push d'un tag "v*"     → build + push tag versionné + :latest
-#   - workflow_dispatch     → build manuel, tag de la branche en cours
+#   - push d'un tag "v*"     → build + push image + bundle GitHub Release
+#   - workflow_dispatch      → build manuel sans Release (artifact uniquement)
 #
-# L'image est disponible ensuite via :
-#   docker pull ghcr.io/<owner>/labsampletracker:2.2.0
+# Outputs :
+#   - Image : ghcr.io/itech-ci/labsampletracker:<version> (publique)
+#   - Bundle : lstracker-deploy-<version>.tar.gz attaché à la GitHub Release,
+#              contient compose + .env.example + configs + scripts + docs
 # =====================================================================
 
-name: Build & Push Docker image
+name: Release — image Docker + bundle déploiement
 
 on:
   push:
@@ -22,12 +24,14 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/labsampletracker
 
 jobs:
+  # ---------- 1. Build & push image Docker ----------
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write       # nécessaire pour push sur ghcr.io
-
+      packages: write
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,9 +54,6 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          # Tags générés automatiquement :
-          #   v2.2.0    -> :2.2.0, :2.2, :2, :latest
-          #   main      -> :main, :sha-<sha>
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -60,15 +61,139 @@ jobs:
             type=ref,event=branch
             type=sha,prefix=sha-
 
-      - name: Build and push
+      - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Build seulement amd64 pour serveur Linux x86_64.
-          # Ajoute linux/arm64 ici si tu déploies sur Apple Silicon / ARM.
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ---------- 2. Bundle de déploiement (attaché à la Release) ----------
+  deploy-bundle:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # nécessaire pour créer/modifier la Release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="dev-${GITHUB_SHA:0:7}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Computed version: $VERSION"
+
+      - name: Pin image tag in compose files
+        # Remplace les fallbacks "...:latest" par la version réelle pour que le
+        # bundle déployé utilise EXACTEMENT l'image qui vient d'être buildée.
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Évite l'embarras du "dev-xxx" qui ne matche pas un tag ghcr.io
+          if [[ "$VERSION" != dev-* ]]; then
+            sed -i "s|labsampletracker:latest|labsampletracker:${VERSION}|g" \
+              docker-compose.demo.yml docker-compose.prod.yml
+            # Met aussi à jour les .env.example pour qu'un copier-coller donne
+            # immédiatement la bonne version
+            sed -i "s|labsampletracker:[0-9].*|labsampletracker:${VERSION}|g" \
+              .env.demo.example .env.prod.example
+          fi
+          # Vérifier le résultat
+          grep -E "labsampletracker:" docker-compose.*.yml .env.*.example || true
+
+      - name: Build bundle directory
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BUNDLE_DIR="lstracker-deploy-${VERSION}"
+
+          mkdir -p "$BUNDLE_DIR"
+
+          # Fichiers à inclure (racine + sous-dossiers conservés)
+          cp INSTALL.md                       "$BUNDLE_DIR/"
+          cp README.md                        "$BUNDLE_DIR/" || true
+          cp docker-compose.demo.yml          "$BUNDLE_DIR/"
+          cp docker-compose.demo.public.yml   "$BUNDLE_DIR/"
+          cp docker-compose.prod.yml          "$BUNDLE_DIR/"
+          cp .env.demo.example                "$BUNDLE_DIR/"
+          cp .env.prod.example                "$BUNDLE_DIR/"
+          cp init_db.sql                      "$BUNDLE_DIR/"
+
+          # Sous-dossiers : configs nginx + postgres, scripts, docs
+          cp -r config                        "$BUNDLE_DIR/"
+          cp -r scripts                       "$BUNDLE_DIR/"
+          cp -r docs                          "$BUNDLE_DIR/"
+
+          # Métadonnées de release dans le bundle
+          cat > "$BUNDLE_DIR/VERSION" <<EOF
+          LSTracker deployment bundle
+          Version: ${VERSION}
+          Built  : $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          Image  : ghcr.io/${{ env.IMAGE_NAME }}:${VERSION}
+          Source : https://github.com/${{ github.repository }}/tree/${GITHUB_SHA:0:7}
+          EOF
+
+          # Permissions sur les scripts
+          chmod +x "$BUNDLE_DIR"/scripts/*.sh
+
+          ls -la "$BUNDLE_DIR"
+
+      - name: Create tarball
+        id: tarball
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TARBALL="lstracker-deploy-${VERSION}.tar.gz"
+          tar -czf "$TARBALL" "lstracker-deploy-${VERSION}"
+          ls -lh "$TARBALL"
+          # Checksums (utile pour vérifier l'intégrité côté serveur)
+          sha256sum "$TARBALL" > "${TARBALL}.sha256"
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
+
+      - name: Upload bundle as workflow artifact
+        # Pour les builds manuels (workflow_dispatch) qui n'ont pas de Release
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.tarball.outputs.tarball }}
+          path: |
+            ${{ steps.tarball.outputs.tarball }}
+            ${{ steps.tarball.outputs.tarball }}.sha256
+          retention-days: 30
+
+      - name: Attach bundle to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.tarball.outputs.tarball }}
+            ${{ steps.tarball.outputs.tarball }}.sha256
+          generate_release_notes: true
+          body: |
+            ## Déploiement
+
+            **Image Docker :** `ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}` (publique)
+
+            **Bundle de déploiement :** `lstracker-deploy-${{ steps.version.outputs.version }}.tar.gz` ci-dessous.
+
+            ### Installation rapide sur un serveur
+
+            ```bash
+            # 1. Télécharger et extraire
+            curl -fsSLO https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/lstracker-deploy-${{ steps.version.outputs.version }}.tar.gz
+            tar -xzf lstracker-deploy-${{ steps.version.outputs.version }}.tar.gz
+            cd lstracker-deploy-${{ steps.version.outputs.version }}
+
+            # 2. Suivre INSTALL.md
+            cat INSTALL.md
+            ```
+
+            Le bundle contient : composes (demo + prod), `.env.example`, configs nginx & postgres, scripts ops, docs complètes.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
