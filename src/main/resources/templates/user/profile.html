@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:th="http://www.thymeleaf.org"
+	xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity6">
+
+<head th:replace="~{fragments/header :: head}">
+<title>Mon profil</title>
+</head>
+
+<body class="sb-nav-fixed">
+
+<style>
+.profile-wrap {
+	max-width: 900px;
+	margin: 0 auto;
+	padding-bottom: 4rem;
+}
+.profile-header {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	align-items: center;
+	padding: 1.25rem;
+	background: #fff;
+	border: 1px solid #e6e9f3;
+	border-radius: .75rem;
+	margin-bottom: 1rem;
+	box-shadow: 0 1px 3px rgba(0,0,0,.03);
+}
+.profile-avatar {
+	width: 64px;
+	height: 64px;
+	border-radius: 50%;
+	background: linear-gradient(135deg, #233B8B 0%, #4f46e5 100%);
+	color: #fff;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 700;
+	font-size: 1.75rem;
+}
+.profile-header .who h1 {
+	font-size: 1.15rem;
+	margin: 0 0 .15rem 0;
+	color: #1f2937;
+	font-weight: 600;
+}
+.profile-header .who .sub {
+	font-size: .8rem;
+	color: #6b7280;
+}
+.profile-header .badges {
+	display: flex; flex-wrap: wrap; gap: .35rem;
+	margin-top: .25rem;
+}
+.profile-header .badge-pill {
+	font-size: .7rem;
+	font-weight: 600;
+	padding: .15rem .55rem;
+	border-radius: 1rem;
+	background: #eef2ff;
+	color: #3730a3;
+}
+.profile-header .b-active { background: #e9f7ef; color: #167b3a; }
+.profile-header .b-locked { background: #fde2e1; color: #9b1c1c; }
+
+.section-card {
+	background: #fff;
+	border: 1px solid #e6e9f3;
+	border-radius: .75rem;
+	margin-bottom: 1rem;
+	box-shadow: 0 1px 3px rgba(0,0,0,.03);
+}
+.section-card .section-header {
+	padding: .75rem 1.25rem;
+	border-bottom: 1px solid #e6e9f3;
+	background: #f8fafc;
+	border-radius: .75rem .75rem 0 0;
+}
+.section-card .section-header h2 {
+	font-size: .95rem;
+	font-weight: 600;
+	color: #1f2937;
+	margin: 0;
+}
+.section-card .section-header h2 i { color: #4f46e5; margin-right: .35rem; }
+.section-card .section-body { padding: 1.25rem; }
+
+.field { margin-bottom: .75rem; }
+.field label {
+	display: block;
+	font-size: .72rem;
+	text-transform: uppercase;
+	font-weight: 600;
+	color: #6b7280;
+	letter-spacing: .03em;
+	margin-bottom: .25rem;
+}
+.field .hint {
+	display: block;
+	font-size: .7rem;
+	color: #9ca3af;
+	margin-top: .15rem;
+}
+
+.scope-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: .65rem;
+}
+.scope-card {
+	background: #f8fafc;
+	border: 1px solid #e6e9f3;
+	border-radius: .5rem;
+	padding: .65rem .85rem;
+}
+.scope-card .lbl {
+	font-size: .68rem;
+	text-transform: uppercase;
+	font-weight: 600;
+	color: #6b7280;
+	letter-spacing: .03em;
+	display: flex;
+	align-items: center;
+	gap: .35rem;
+}
+.scope-card .val {
+	font-size: 1.25rem;
+	font-weight: 700;
+	color: #1f2937;
+	line-height: 1.15;
+	margin-top: .15rem;
+}
+
+.save-bar {
+	background: #f8fafc;
+	border-top: 1px solid #e6e9f3;
+	padding: .85rem 1.25rem;
+	margin-top: .5rem;
+	border-radius: .5rem;
+	display: flex;
+	justify-content: flex-end;
+	gap: .5rem;
+}
+</style>
+
+	<div class="d-flex" id="wrapper">
+		<div id="page-content-wrapper">
+
+			<div th:insert="~{fragments/header :: header(content='Mon profil', module='user')}"></div>
+
+			<div class="container-fluid py-3 profile-wrap">
+
+				<!-- Header -->
+				<div class="profile-header">
+					<div class="profile-avatar"
+						th:text="${user?.firstName != null and !#strings.isEmpty(user.firstName) ? #strings.toUpperCase(#strings.substring(user.firstName,0,1)) : (user?.login != null and !#strings.isEmpty(user.login) ? #strings.toUpperCase(#strings.substring(user.login,0,1)) : 'U')}">U</div>
+					<div class="who flex-grow-1">
+						<h1>
+							<span th:text="${user?.firstName} ?: ''"></span>
+							<span th:text="${user?.lastName} ?: ''"></span>
+							<span th:if="${(user?.firstName == null or #strings.isEmpty(user.firstName)) and (user?.lastName == null or #strings.isEmpty(user.lastName))}"
+								class="text-muted" th:text="${user?.login}">utilisateur</span>
+						</h1>
+						<div class="sub" th:text="'@' + ${user?.login}">@login</div>
+						<div class="badges">
+							<span class="badge-pill" th:if="${currentRole}" th:text="${currentRole}">RÔLE</span>
+							<span class="badge-pill" th:if="${currentUserType}" th:text="${currentUserType}">Type</span>
+							<span class="badge-pill" th:if="${currentUserLevel}" th:text="${currentUserLevel}">Niveau</span>
+							<span class="badge-pill b-active" th:if="${isActive}"><i class="fas fa-check-circle"></i> Actif</span>
+							<span class="badge-pill b-locked" th:if="${isLocked}"><i class="fas fa-lock"></i> Verrouillé</span>
+						</div>
+					</div>
+					<div class="text-end small text-muted">
+						<div th:if="${lastLogin}">
+							<i class="fas fa-clock"></i>
+							Dernière connexion :
+							<strong th:text="${#dates.format(lastLogin, 'dd/MM/yyyy à HH:mm')}">—</strong>
+						</div>
+						<div th:if="${passwordExpireAt}">
+							<i class="fas fa-key"></i>
+							Mot de passe expire le :
+							<strong th:text="${#dates.format(passwordExpireAt, 'dd/MM/yyyy')}">—</strong>
+						</div>
+					</div>
+				</div>
+
+				<!-- Flash messages -->
+				<div th:if="${message_error != null}" class="alert alert-danger" th:text="${message_error}"></div>
+				<div th:if="${message_success != null}" class="alert alert-success" th:text="${message_success}"></div>
+
+				<form th:object="${user}" th:action="@{/appuser/profile/edit}" method="post" id="profileForm">
+					<input th:field="*{id}" type="hidden"/>
+
+					<!-- Identité -->
+					<div class="section-card">
+						<div class="section-header">
+							<h2><i class="fas fa-id-card"></i> Identité</h2>
+						</div>
+						<div class="section-body">
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="inputLogin">Identifiant</label>
+									<input th:field="*{login}" type="text" id="inputLogin" class="form-control form-control-sm" disabled/>
+									<span class="hint">Identifiant non modifiable.</span>
+								</div>
+								<div class="col-md-6 field">
+									<label for="inputContact">Téléphone</label>
+									<input th:field="*{phoneContact}" type="text" id="inputContact"
+										class="form-control form-control-sm"
+										pattern="^((00225)?|(\+225)?)([\d]{10})$"
+										required/>
+								</div>
+							</div>
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="inputLastName">Nom</label>
+									<input th:field="*{lastName}" type="text" id="inputLastName" class="form-control form-control-sm"/>
+								</div>
+								<div class="col-md-6 field">
+									<label for="inputFirstName">Prénoms</label>
+									<input th:field="*{firstName}" type="text" id="inputFirstName" class="form-control form-control-sm"/>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Sécurité -->
+					<div class="section-card">
+						<div class="section-header">
+							<h2><i class="fas fa-shield-alt"></i> Sécurité</h2>
+						</div>
+						<div class="section-body">
+							<div class="alert alert-info small mb-3">
+								<i class="fas fa-info-circle"></i>
+								Laissez ces champs vides si vous ne souhaitez pas changer votre mot de passe.
+								<br/>Au moins 8 caractères, 1 majuscule, 1 minuscule, 1 chiffre, 1 caractère spécial.
+							</div>
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="inputPassword">Nouveau mot de passe</label>
+									<input th:field="*{password}" type="password" id="inputPassword"
+										class="form-control form-control-sm"
+										autocomplete="new-password" minlength="8" maxlength="128"/>
+								</div>
+								<div class="col-md-6 field">
+									<label for="inputRepassword">Confirmer le mot de passe</label>
+									<input th:field="*{repassword}" type="password" id="inputRepassword"
+										class="form-control form-control-sm"
+										autocomplete="new-password" minlength="8" maxlength="128"/>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Zones accessibles (read-only) -->
+					<div class="section-card">
+						<div class="section-header">
+							<h2><i class="fas fa-map-marked-alt"></i> Zones accessibles</h2>
+						</div>
+						<div class="section-body">
+							<div th:if="${scopeGlobal}" class="alert alert-success small mb-0">
+								<i class="fas fa-globe"></i>
+								Vous avez un <strong>accès global</strong> à toutes les zones.
+							</div>
+							<div th:if="${scopeGlobal == false}">
+								<div class="scope-grid">
+									<div class="scope-card">
+										<div class="lbl"><i class="fas fa-globe-africa text-primary"></i> Régions</div>
+										<div class="val" th:text="${accessibleRegionCount ?: 0}">0</div>
+									</div>
+									<div class="scope-card">
+										<div class="lbl"><i class="fas fa-map text-info"></i> Districts</div>
+										<div class="val" th:text="${accessibleDistrictCount ?: 0}">0</div>
+									</div>
+									<div class="scope-card">
+										<div class="lbl"><i class="fas fa-clinic-medical text-success"></i> Sites</div>
+										<div class="val" th:text="${accessibleSiteCount ?: 0}">0</div>
+									</div>
+									<div class="scope-card">
+										<div class="lbl"><i class="fas fa-flask text-purple"></i> Laboratoires</div>
+										<div class="val" th:text="${accessibleLabCount ?: 0}">0</div>
+									</div>
+									<div class="scope-card">
+										<div class="lbl"><i class="fas fa-route text-warning"></i> Circuits</div>
+										<div class="val" th:text="${accessibleCircuitCount ?: 0}">0</div>
+									</div>
+								</div>
+								<div class="small text-muted mt-2">
+									<i class="fas fa-info-circle"></i>
+									Les zones sont gérées par un administrateur. Contactez-le pour toute modification.
+								</div>
+							</div>
+						</div>
+					</div>
+
+				</form>
+
+				<div class="save-bar">
+		<a th:href="@{/}" class="btn btn-outline-secondary">Retour à l'accueil</a>
+		<button type="submit" form="profileForm" class="btn btn-primary">
+			<i class="fas fa-save"></i> Enregistrer les modifications
+		</button>
+	</div>
+
+			</div>
+		</div>
+	</div>
+
+	<!-- Sticky save bar -->
+	<footer class="py-4 bg-light mt-auto" th:insert="~{fragments/footer :: footer}"></footer>
+
+	<script th:src="@{/webjars/jquery/3.6.0/jquery.min.js}"></script>
+	<script th:src="@{/webjars/bootstrap/5.1.3/js/bootstrap.bundle.min.js}"></script>
+	<script th:src="@{/webjars/font-awesome/5.15.4/js/all.js}"></script>
+
+	<script>
+	// Simple frontend check: password = repassword
+	document.getElementById('profileForm').addEventListener('submit', function(e) {
+		const p = document.getElementById('inputPassword').value || '';
+		const r = document.getElementById('inputRepassword').value || '';
+		if (p || r) {
+			if (p !== r) {
+				e.preventDefault();
+				alert('Les deux mots de passe ne correspondent pas.');
+				return;
+			}
+			if (p.length < 8) {
+				e.preventDefault();
+				alert('Le mot de passe doit comporter au moins 8 caractères.');
+			}
+		}
+	});
+	</script>
+
+</body>
+</html>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd
+    http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+
+	<changeSet id="001-create-refresh-tokens" author="pkomena">
+		<createTable tableName="refresh_tokens">
+			<column name="id" type="BIGINT" autoIncrement="true">
+				<constraints primaryKey="true"
+					primaryKeyName="pk_refresh_tokens" />
+			</column>
+
+			<column name="user_id" type="BIGINT" />
+			<column name="username" type="VARCHAR(255)" />
+			<column name="role" type="VARCHAR(64)" />
+
+			<column name="token_hash" type="VARCHAR(128)">
+				<constraints nullable="false" />
+			</column>
+			<column name="expires_at" type="TIMESTAMP" />
+			<column name="created_at" type="TIMESTAMP" />
+			<column name="created_by_ip" type="VARCHAR(64)" />
+
+			<column name="revoked" type="BOOLEAN"
+				defaultValueBoolean="false" />
+			<column name="replaced_by_token_hash" type="VARCHAR(128)" />
+		</createTable>
+
+		<addUniqueConstraint tableName="refresh_tokens"
+			columnNames="token_hash" constraintName="uk_refresh_token_hash" />
+
+		<createIndex tableName="refresh_tokens"
+			indexName="idx_rt_user">
+			<column name="user_id" />
+		</createIndex>
+
+		<createIndex tableName="refresh_tokens"
+			indexName="idx_rt_token_hash" unique="true">
+			<column name="token_hash" />
+		</createIndex>
+
+		<rollback>
+			<dropTable tableName="refresh_tokens" />
+		</rollback>
+	</changeSet>
+
+</databaseChangeLog>

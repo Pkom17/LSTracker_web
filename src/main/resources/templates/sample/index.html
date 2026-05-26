@@ -1,0 +1,1750 @@
+<!doctype html>
+<html
+  lang="fr"
+  xmlns="http://www.w3.org/1999/xhtml"
+  xmlns:th="http://www.thymeleaf.org"
+  xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity6"
+>
+  <head th:replace="~{fragments/header :: head}">
+    <title>Suivi des échantillons</title>
+  </head>
+
+  <body class="sb-nav-fixed">
+    <style>
+      /* ===== Layout : panneau filtres avancés (collapsible) au-dessus du tableau ===== */
+      .sample-layout {
+        display: block;
+      }
+      .sample-layout > main {
+        min-width: 0;
+      }
+
+      /* Panneau filtres avancés (au-dessus, collapsible) */
+      .sample-sidebar {
+        border: 1px solid #e6e9f3;
+        border-radius: 0.75rem;
+        background: #fff;
+        margin-bottom: 0.5rem;
+      }
+      .sample-sidebar .sidebar-header {
+        background: #f8fafc;
+        border-bottom: 1px solid #e6e9f3;
+        padding: 0.5rem 0.9rem;
+        border-radius: 0.75rem 0.75rem 0 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        user-select: none;
+      }
+      /* Si la sidebar est repliée, on retire la bordure basse du header */
+      .sample-sidebar.collapsed .sidebar-header {
+        border-bottom: 0;
+        border-radius: 0.75rem;
+      }
+      .sample-sidebar .sidebar-header .chevron {
+        transition: transform 0.2s ease;
+      }
+      .sample-sidebar.collapsed .sidebar-header .chevron {
+        transform: rotate(-90deg);
+      }
+
+      /* Grille responsive de groupes de filtres (au lieu d'une colonne verticale) */
+      .sample-sidebar .sidebar-body {
+        padding: 0.6rem 0.75rem;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 0.4rem 0.6rem;
+        align-items: start;
+      }
+      .sample-sidebar.collapsed .sidebar-body {
+        display: none;
+      }
+      /* Compact form controls inside the panel */
+      .sample-sidebar .form-control,
+      .sample-sidebar .form-select,
+      .sample-sidebar .input-group-text {
+        font-size: 0.78rem;
+      }
+      .sample-sidebar .input-group-sm {
+        min-height: calc(1.5em + 0.5rem + 2px);
+      }
+      .sample-sidebar .input-group-text {
+        align-items: center;
+        background: #f8fafc;
+        color: #4b5563;
+        font-weight: 600;
+        min-width: 6.75rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        white-space: nowrap;
+      }
+      .sample-sidebar .input-group-text.icon-only {
+        justify-content: center;
+        min-width: 2.25rem;
+      }
+      .sample-sidebar .input-group > .select2-container {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: 1% !important;
+      }
+      /* Aligner la hauteur des Select2 sur celle des input.form-control-sm */
+      .sample-sidebar .select2-container--default .select2-selection--single {
+        height: calc(1.5em + 0.5rem + 2px);
+        border-color: #ced4da;
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+      }
+      .sample-sidebar
+        .select2-container--default
+        .select2-selection--single
+        .select2-selection__rendered {
+        line-height: calc(1.5em + 0.5rem);
+        padding-left: 0.5rem;
+        font-size: 0.78rem;
+      }
+      .sample-sidebar
+        .select2-container--default
+        .select2-selection--single
+        .select2-selection__arrow {
+        height: calc(1.5em + 0.5rem);
+      }
+      .sample-sidebar .select2-container--default .select2-selection--multiple {
+        min-height: calc(1.5em + 0.5rem + 2px);
+        border-color: #ced4da;
+        padding: 0 0.25rem;
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+      }
+      .sample-sidebar
+        .select2-container--default
+        .select2-selection--multiple
+        .select2-selection__choice {
+        font-size: 0.72rem;
+        padding: 0 0.35rem;
+        margin: 2px 2px 0 0;
+      }
+      .sample-sidebar
+        .select2-container--default
+        .select2-search--inline
+        .select2-search__field {
+        margin-top: 3px;
+        font-size: 0.78rem;
+      }
+      .sample-sidebar .filter-group {
+        margin-bottom: 0;
+      }
+      .sample-sidebar .filter-search {
+        grid-column: 1 / span 2;
+      }
+      .sample-sidebar .filter-period {
+        grid-column: 3 / span 5;
+      }
+      .sample-sidebar .filter-presets {
+        grid-column: 8 / span 3;
+      }
+      .sample-sidebar .filter-region {
+        grid-column: 1 / span 3;
+      }
+      .sample-sidebar .filter-district {
+        grid-column: 4 / span 3;
+      }
+      .sample-sidebar .filter-site {
+        grid-column: 7 / span 6;
+      }
+      .sample-sidebar .filter-lab {
+        grid-column: 1 / span 3;
+      }
+      .sample-sidebar .filter-status {
+        grid-column: 4 / span 3;
+      }
+      .sample-sidebar .filter-type {
+        grid-column: 7 / span 3;
+      }
+      .sample-sidebar .filter-nature {
+        grid-column: 10 / span 3;
+      }
+      @media (max-width: 991.98px) {
+        .sample-sidebar .filter-group {
+          grid-column: 1 / -1;
+        }
+      }
+
+      /* Date presets chips */
+      .date-presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.2rem;
+      }
+      .date-presets .btn {
+        font-size: 0.68rem;
+        height: calc(1.5em + 0.5rem + 2px);
+        padding: 0.1rem 0.42rem;
+      }
+
+      /* Période : dates compactes pour rester sur la ligne de recherche */
+      .period-range .input-group-text {
+        min-width: auto;
+        padding: 0.15rem 0.35rem;
+        font-size: 0.7rem;
+      }
+      .period-range .input-group:first-child .input-group-text:first-child {
+        min-width: 8.75rem;
+      }
+      .period-range .date-input {
+        flex: 0 0 7.5rem;
+        min-width: 0;
+      }
+
+      /* Toggle rows */
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.15rem 0;
+      }
+      .toggle-row span {
+        font-size: 0.78rem;
+        color: #374151;
+      }
+
+      /* Active filter pills — pas d'espace réservé quand vide */
+      .active-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+      }
+      .active-filters:not(:empty) {
+        margin: 0 0 0.5rem 0;
+      }
+      .active-filters .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        background: #eef2ff;
+        color: #3730a3;
+        font-size: 0.75rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 1rem;
+      }
+      .active-filters .pill button {
+        background: none;
+        border: none;
+        color: #3730a3;
+        font-size: 0.9rem;
+        line-height: 1;
+        padding: 0;
+        cursor: pointer;
+      }
+
+      /* Toolbar */
+      .table-toolbar {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        align-items: stretch; /* equal height for every child */
+        margin: 0 0 0.5rem 0;
+        padding: 0.4rem 0.6rem;
+        border: 1px solid #e6e9f3;
+        border-radius: 0.5rem;
+        background: #fff;
+      }
+      .table-toolbar > .toolbar-item {
+        display: flex;
+        align-items: center;
+      }
+      .toolbar-toggles {
+        gap: 0.75rem;
+        padding-left: 0.25rem;
+      }
+      .toolbar-toggles .form-check-label {
+        cursor: pointer;
+        user-select: none;
+      }
+      .toolbar-toggles .form-check-input {
+        cursor: pointer;
+      }
+      .search-input {
+        max-width: 320px;
+        flex: 1 1 220px;
+      }
+      .search-input .form-control-sm {
+        height: calc(
+          1.5em + 0.5rem + 2px
+        ); /* match btn-sm height for alignment */
+      }
+
+      /* TAT badge (Turnaround Time in days) */
+      .sla-badge {
+        display: inline-block;
+        min-width: 2.25rem;
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.75rem;
+        padding: 0.15rem 0.45rem;
+        border-radius: 0.25rem;
+        color: #fff;
+      }
+      .sla-green {
+        background: #16a34a;
+      }
+      .sla-orange {
+        background: #f59e0b;
+      }
+      .sla-red {
+        background: #dc2626;
+      }
+
+      /* Status pills */
+      .status-pill {
+        display: inline-block;
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.15rem 0.55rem;
+        border-radius: 1rem;
+        white-space: nowrap;
+        background: #f1f5f9;
+        color: #334155;
+      }
+      .st-on_transit {
+        background: #fff3cd;
+        color: #856404;
+      }
+      .st-received_at_hub,
+      .st-received_at_reference_lab,
+      .st-received_at_district_lab,
+      .st-received_at_tb_lab {
+        background: #dfefff;
+        color: #155e9c;
+      }
+      .st-accepted_at_hub,
+      .st-accepted_at_reference_lab,
+      .st-accepted_at_district_lab,
+      .st-accepted_at_tb_lab {
+        background: #e9f7ef;
+        color: #167b3a;
+      }
+      .st-analysis_done {
+        background: #e7f3fe;
+        color: #155e9c;
+      }
+      .st-result_collected {
+        background: #f0e6ff;
+        color: #5a30a0;
+      }
+      .st-result_on_site {
+        background: #e2f0d9;
+        color: #2d6b1d;
+      }
+      .st-non_conform {
+        background: #fde2e1;
+        color: #9b1c1c;
+      }
+      .st-analysis_failed {
+        background: #ffe6e6;
+        color: #9b1c1c;
+      }
+
+      /* Row actions */
+      .row-actions {
+        display: flex;
+        gap: 0.2rem;
+      }
+      .row-actions .btn-action {
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #374151;
+        font-size: 0.8rem;
+        padding: 0.15rem 0.45rem;
+        border-radius: 0.25rem;
+        cursor: pointer;
+        line-height: 1;
+      }
+      .row-actions .btn-action:hover {
+        background: #f3f4f6;
+      }
+
+      /* Inline copy icon (next to identifiers in cells) */
+      .copy-cell {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+      }
+      .copy-cell .copy-btn {
+        background: none;
+        border: none;
+        color: #9ca3af;
+        font-size: 0.75rem;
+        padding: 0 0.15rem;
+        cursor: pointer;
+        opacity: 0;
+        transition:
+          opacity 0.15s,
+          color 0.15s;
+      }
+      .copy-cell:hover .copy-btn {
+        opacity: 1;
+      }
+      .copy-cell .copy-btn:hover {
+        color: #4f46e5;
+      }
+      .copy-cell .copy-btn:focus {
+        opacity: 1;
+        outline: none;
+      }
+
+      /* Timeline */
+      .timeline {
+        position: relative;
+        padding-left: 1.5rem;
+        margin-top: 1rem;
+      }
+      .timeline::before {
+        content: "";
+        position: absolute;
+        left: 0.5rem;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #e6e9f3;
+      }
+      .timeline-item {
+        position: relative;
+        padding-bottom: 1rem;
+      }
+      .timeline-item::before {
+        content: "";
+        position: absolute;
+        left: -1.15rem;
+        top: 0.2rem;
+        width: 0.75rem;
+        height: 0.75rem;
+        border-radius: 50%;
+        background: #4f46e5;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 2px #e6e9f3;
+      }
+      .timeline-item .time {
+        font-size: 0.75rem;
+        color: #6b7280;
+      }
+      .timeline-item .event {
+        font-weight: 600;
+        color: #1f2937;
+        margin: 0.15rem 0;
+      }
+      .timeline-item .meta {
+        font-size: 0.8rem;
+        color: #4b5563;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem 1rem;
+      }
+      .detail-grid > div {
+        padding: 0.15rem 0;
+      }
+      .detail-grid .lbl {
+        color: #6b7280;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+
+      /* Sections du modal détail */
+      .detail-section {
+        margin-bottom: 1.1rem;
+      }
+      .detail-section-title {
+        color: #1f2937;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin: 0 0 0.5rem 0;
+        padding-bottom: 0.35rem;
+        border-bottom: 1px solid #e6e9f3;
+      }
+      .detail-section .detail-grid {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+      @media (max-width: 768px) {
+        .detail-section .detail-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      /* DataTables tweaks */
+      table#tab_sample thead th {
+        background: #f8fafc;
+        border-bottom: 2px solid #e6e9f3;
+        font-size: 0.8rem;
+        /* Wrap par mot pour ne pas étirer la colonne avec un long libellé.
+	   Limite haute pour les libellés à 2 mots. */
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: anywhere;
+        vertical-align: middle;
+        min-width: 80px;
+      }
+      table#tab_sample tbody td {
+        vertical-align: middle;
+        font-size: 0.85rem;
+      }
+      table#tab_sample tbody tr:hover {
+        background: #fafcff;
+      }
+
+      /* Colonne # (classe col-num) : très étroite */
+      table#tab_sample th.col-num,
+      table#tab_sample td.col-num {
+        width: 50px;
+        text-align: center;
+        white-space: nowrap;
+      }
+
+      /* La card-body est contrainte à ~1638px par le grid parent (cf.
+   diagnostic) mais le tableau peut dépasser à 2000+ px quand toutes
+   les colonnes sont visibles. overflow-x:auto déclenche alors la
+   barre horizontale au bon niveau (Responsive ne s'active pas
+   correctement avec serverSide:true dans cette version). */
+      .card-body {
+        overflow-x: auto;
+        position: relative; /* point d'ancrage du loader absolu */
+      }
+
+      /* Loader AJAX DataTables : overlay centré au-dessus du tableau */
+      #tab_sample_processing {
+        position: absolute !important;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.72);
+        z-index: 5;
+        color: #1f2937;
+        font-size: 0.9rem;
+        font-weight: 500;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        text-align: center;
+      }
+      #tab_sample_processing i {
+        font-size: 1.4rem;
+        color: #2563eb;
+        margin-right: 0.5rem;
+      }
+
+      .input-icon {
+        position: relative;
+      }
+      .input-icon i {
+        position: absolute;
+        left: 0.55rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+      }
+      .input-icon input {
+        padding-left: 1.75rem;
+      }
+    </style>
+
+    <div class="d-flex" id="wrapper">
+      <div id="page-content-wrapper">
+        <div
+          th:insert="~{fragments/header :: header(content='Suivi des échantillons', module='sample')}"
+        ></div>
+
+        <div class="container-fluid py-3">
+          <div class="sample-layout">
+            <!-- ============ PANNEAU FILTRES AVANCÉS (collapsible, au-dessus) ============ -->
+            <aside class="sample-sidebar collapsed" id="advancedFiltersPanel">
+              <div class="sidebar-header" id="advancedFiltersHeader">
+                <div class="d-flex align-items-center gap-2">
+                  <i class="fas fa-chevron-down chevron text-muted"></i>
+                  <i class="fas fa-filter text-primary"></i>
+                  <strong>Filtres avancés</strong>
+                </div>
+                <button
+                  class="btn btn-sm btn-link p-0 text-decoration-none"
+                  id="btnResetAll"
+                  type="button"
+                  title="Tout effacer"
+                  onclick="event.stopPropagation()"
+                >
+                  <i class="fas fa-times-circle"></i> Effacer
+                </button>
+              </div>
+
+              <div class="sidebar-body">
+                <!-- Recherche full-text (sans label, icône intégrée) -->
+                <div class="filter-group filter-search">
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text icon-only"
+                      ><i class="fas fa-search"></i
+                    ></span>
+                    <input
+                      type="search"
+                      id="searchText"
+                      class="form-control"
+                      placeholder="ID, patient, n° labo..."
+                      autocomplete="off"
+                    />
+                  </div>
+                </div>
+
+                <!-- Date range compact -->
+                <div class="filter-group filter-period">
+                  <div class="period-range">
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-text"
+                        >Période (prélèvement)</span
+                      >
+                      <span class="input-group-text">du</span>
+                      <input
+                        type="text"
+                        id="startDate"
+                        class="form-control date-input"
+                        placeholder="jj/mm/aaaa"
+                        autocomplete="off"
+                      />
+                      <span class="input-group-text">au</span>
+                      <input
+                        type="text"
+                        id="endDate"
+                        class="form-control date-input"
+                        placeholder="jj/mm/aaaa"
+                        autocomplete="off"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="filter-group filter-presets">
+                  <div class="date-presets">
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      data-preset="today"
+                    >
+                      Auj.
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      data-preset="7d"
+                    >
+                      7 j
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      data-preset="30d"
+                    >
+                      30 j
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      data-preset="month"
+                    >
+                      Ce mois
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      data-preset="clear"
+                    >
+                      Effacer
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Région / District / Site / Lab -->
+                <div class="filter-group filter-region">
+                  <div class="input-group input-group-sm">
+                    <label class="input-group-text" for="select_region"
+                      >Région</label
+                    >
+                    <select
+                      class="form-select form-select-sm select2-single"
+                      id="select_region"
+                    >
+                      <option value=""></option>
+                      <option
+                        th:each="r : ${regions}"
+                        th:value="${r.id}"
+                        th:text="${r.name}"
+                      ></option>
+                    </select>
+                  </div>
+                </div>
+                <div class="filter-group filter-district">
+                  <div class="input-group input-group-sm">
+                    <label class="input-group-text" for="select_district"
+                      >District</label
+                    >
+                    <select
+                      class="form-select form-select-sm select2-single"
+                      id="select_district"
+                    >
+                      <option value=""></option>
+                      <option
+                        th:each="d : ${districts}"
+                        th:value="${d.id}"
+                        th:text="${d.name}"
+                      ></option>
+                    </select>
+                  </div>
+                </div>
+                <div class="filter-group filter-site">
+                  <div class="input-group input-group-sm">
+                    <label class="input-group-text" for="select_site"
+                      >Site</label
+                    >
+                    <select
+                      class="form-select form-select-sm select2-single"
+                      id="select_site"
+                    >
+                      <option value=""></option>
+                      <option
+                        th:each="s : ${sites}"
+                        th:value="${s.id}"
+                        th:text="${s.name}"
+                      ></option>
+                    </select>
+                  </div>
+                </div>
+                <div class="filter-group filter-lab">
+                  <div class="input-group input-group-sm">
+                    <label class="input-group-text" for="select_lab"
+                      >Laboratoire</label
+                    >
+                    <select
+                      class="form-select form-select-sm select2-single"
+                      id="select_lab"
+                    >
+                      <option value=""></option>
+                      <option
+                        th:each="l : ${labs}"
+                        th:value="${l.id}"
+                        th:text="${l.name}"
+                      ></option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Multi-statuts -->
+                <div class="filter-group filter-status">
+                  <div class="input-group input-group-sm">
+                    <label class="input-group-text" for="select_status"
+                      >Statuts</label
+                    >
+                    <select
+                      class="form-select form-select-sm select2-multi"
+                      id="select_status"
+                      multiple
+                    >
+                      <option
+                        th:each="st : ${statusList}"
+                        th:value="${st.id}"
+                        th:text="${st.description}"
+                      ></option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Multi-types -->
+                <div class="filter-group filter-type">
+                  <div class="input-group input-group-sm">
+                    <label class="input-group-text" for="select_type"
+                      >Types</label
+                    >
+                    <select
+                      class="form-select form-select-sm select2-multi"
+                      id="select_type"
+                      multiple
+                    >
+                      <option
+                        th:each="t : ${sampleTypeList}"
+                        th:value="${t.id}"
+                        th:text="${t.name}"
+                      ></option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Multi-natures (texte libre saisi côté mobile) -->
+                <div class="filter-group filter-nature">
+                  <div class="input-group input-group-sm">
+                    <label class="input-group-text" for="select_nature"
+                      >Natures</label
+                    >
+                    <select
+                      class="form-select form-select-sm select2-multi"
+                      id="select_nature"
+                      multiple
+                    >
+                      <option
+                        th:each="n : ${natureList}"
+                        th:value="${n}"
+                        th:text="${n}"
+                      ></option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <!-- ============ MAIN ============ -->
+            <main>
+              <div class="active-filters" id="activeFiltersBar"></div>
+
+              <!-- Toolbar -->
+              <div class="table-toolbar">
+                <div class="toolbar-item input-icon search-input">
+                  <i class="fas fa-search"></i>
+                  <input
+                    type="search"
+                    id="quickSearch"
+                    class="form-control form-control-sm"
+                    placeholder="Recherche rapide..."
+                    autocomplete="off"
+                  />
+                </div>
+
+                <div class="toolbar-item dropdown">
+                  <button
+                    class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                    type="button"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                  >
+                    <i class="fas fa-columns me-1"></i> Colonnes
+                  </button>
+                  <ul
+                    class="dropdown-menu p-2"
+                    id="colChooser"
+                    style="min-width: 220px"
+                  ></ul>
+                </div>
+
+                <!-- Raccourcis (déplacés depuis la zone Filtres avancés) -->
+                <div class="toolbar-item toolbar-toggles">
+                  <div class="form-check form-switch m-0">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="toggleStuck"
+                    />
+                    <label
+                      class="form-check-label small"
+                      for="toggleStuck"
+                      title="Échantillons en retard (> 7 jours)"
+                    >
+                      <i
+                        class="fas fa-exclamation-triangle text-warning me-1"
+                      ></i
+                      >En retard
+                    </label>
+                  </div>
+                  <div class="form-check form-switch m-0">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="toggleRejected"
+                    />
+                    <label
+                      class="form-check-label small"
+                      for="toggleRejected"
+                      title="Échantillons rejetés ou en échec"
+                    >
+                      <i class="fas fa-ban text-danger me-1"></i>Rejetés
+                    </label>
+                  </div>
+                </div>
+
+                <div class="toolbar-item ms-auto gap-2">
+                  <button
+                    class="btn btn-sm btn-outline-primary me-2"
+                    id="btnExportCsv"
+                    type="button"
+                  >
+                    <i class="fas fa-file-csv me-1"></i> CSV
+                  </button>
+                  <button
+                    class="btn btn-sm btn-outline-secondary"
+                    id="btnReload"
+                    type="button"
+                    title="Rafraîchir"
+                  >
+                    <i class="fas fa-sync"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- DataTable -->
+              <div class="card shadow-sm">
+                <div class="card-body p-2">
+                  <table
+                    id="tab_sample"
+                    class="table table-sm table-hover table-striped align-middle"
+                  >
+                    <thead>
+                      <tr>
+                        <th class="col-num">#</th>
+                        <th data-col="district">District</th>
+                        <th data-col="site">Site de collecte</th>
+                        <th data-col="sample_type">Type d'échantillon</th>
+                        <th data-col="sample_nature">Nature du Prélèvement</th>
+                        <th data-col="patient_identifier">ID Patient</th>
+                        <!-- <th data-col="sample_identifier">ID Échantillon</th> -->
+                        <th data-col="collection_date">Date Prélèvement</th>
+                        <th data-col="destination_lab">Destination</th>
+                        <th data-col="status">Statut</th>
+                        <th data-col="rejection_comment">Raison du rejet</th>
+                        <th data-col="reception_date">Réception Labo</th>
+                        <th data-col="lab">Labo de réception</th>
+                        <th data-col="lab_number">N° labo</th>
+                        <th data-col="distance">Distance (km)</th>
+                        <th data-col="analysis_completed_date">
+                          Analyse terminée
+                        </th>
+                        <th data-col="analysis_released_date">
+                          Résultats disponibles
+                        </th>
+                        <th data-col="result_collection_date">
+                          Collecte résultats
+                        </th>
+                        <th data-col="result_delivery_date">
+                          Réception sur site
+                        </th>
+                        <th data-col="tat_days">TAT (j)</th>
+                        <th data-col="actions">Actions</th>
+                      </tr>
+                    </thead>
+                  </table>
+                </div>
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ MODAL DÉTAIL ============ -->
+    <div
+      class="modal fade"
+      id="sampleDetailModal"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="fas fa-vial text-primary"></i>
+              Détail de l'échantillon
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Fermer"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div id="detailLoading" class="text-center py-4">
+              <div class="spinner-border text-primary"></div>
+            </div>
+            <div id="detailContent" style="display: none">
+              <div id="detailFields"></div>
+
+              <div
+                id="detailRejection"
+                class="alert alert-danger mt-3"
+                style="display: none"
+              ></div>
+
+              <h6 class="text-uppercase text-muted small mt-4 mb-2">
+                Chronologie des événements
+              </h6>
+              <div class="timeline" id="detailTimeline"></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              data-bs-dismiss="modal"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer
+      class="py-4 bg-light mt-auto"
+      th:insert="~{fragments/footer :: footer}"
+    ></footer>
+
+    <!-- Scripts -->
+    <script th:src="@{/webjars/jquery/3.6.0/jquery.min.js}"></script>
+    <script th:src="@{/webjars/jquery-ui/1.13.2/jquery-ui.min.js}"></script>
+    <script
+      th:src="@{/webjars/bootstrap/5.1.3/js/bootstrap.bundle.min.js}"
+    ></script>
+    <script th:src="@{/webjars/font-awesome/5.15.4/js/all.js}"></script>
+    <script th:src="@{/webjars/select2/4.0.13/js/select2.min.js}"></script>
+    <script th:src="@{/DataTables/datatables.min.js}"></script>
+
+    <script th:inline="javascript">
+      /*<![CDATA[*/
+      window.CAN_EDIT_SAMPLES = /*[[${canEditSamples}]]*/ false;
+      /*]]>*/
+    </script>
+
+    <script th:inline="none">
+      /* eslint-disable */
+      $(function () {
+        // Datepickers (using jQuery UI like the legacy template)
+        $.datepicker.regional["fr"] = $.datepicker.regional["fr"] || {};
+        const dateFormat = "dd/mm/yy";
+        $("#startDate, #endDate").datepicker({
+          changeMonth: true,
+          changeYear: true,
+          dateFormat: dateFormat,
+          showAnim: "",
+          firstDay: 1,
+        });
+
+        // Select2 init
+        $(".select2-single").select2({
+          width: "100%",
+          allowClear: true,
+          placeholder: "— Tous —",
+        });
+        $(".select2-multi").select2({
+          width: "100%",
+          allowClear: true,
+          placeholder: "— Sélectionner —",
+        });
+
+        // Region → District → Site cascades
+        $("#select_region").on("change", function () {
+          const r = $(this).val();
+          if (!r) return;
+          $.get("district/names_by_regions?regions=" + r, function (districts) {
+            const $d = $("#select_district");
+            $d.empty().append('<option value=""></option>');
+            $.each(districts, (i, d) =>
+              $d.append('<option value="' + d.id + '">' + d.name + "</option>"),
+            );
+            $d.val(null).trigger("change");
+          });
+        });
+        $("#select_district").on("change", function () {
+          const d = $(this).val();
+          if (!d) return;
+          $.get("site/names_by_districts?districts=" + d, function (sites) {
+            const $s = $("#select_site");
+            $s.empty().append('<option value=""></option>');
+            $.each(sites, (i, s) =>
+              $s.append('<option value="' + s.id + '">' + s.name + "</option>"),
+            );
+            $s.val(null).trigger("change");
+          });
+        });
+
+        // Date presets — work with dd/mm/yyyy format
+        $(".date-presets .btn").on("click", function () {
+          const p = $(this).data("preset");
+          const today = new Date();
+          const fmt = (d) => {
+            const pad = (n) => String(n).padStart(2, "0");
+            return (
+              pad(d.getDate()) +
+              "/" +
+              pad(d.getMonth() + 1) +
+              "/" +
+              d.getFullYear()
+            );
+          };
+          let start = "",
+            end = "";
+          if (p === "today") {
+            start = end = fmt(today);
+          } else if (p === "7d") {
+            const s = new Date(today);
+            s.setDate(today.getDate() - 7);
+            start = fmt(s);
+            end = fmt(today);
+          } else if (p === "30d") {
+            const s = new Date(today);
+            s.setDate(today.getDate() - 30);
+            start = fmt(s);
+            end = fmt(today);
+          } else if (p === "month") {
+            const s = new Date(today.getFullYear(), today.getMonth(), 1);
+            start = fmt(s);
+            end = fmt(today);
+          }
+          $("#startDate").val(start);
+          $("#endDate").val(end);
+          reloadTable();
+        });
+
+        // DataTable
+        // `visible: false` = colonnes masquées par défaut. L'utilisateur
+        // peut les afficher via le menu "Colonnes" de la toolbar.
+        const columnsConfig = [
+          {
+            data: null,
+            orderable: false,
+            searchable: false,
+            className: "col-num text-center text-muted",
+            render: function (data, type, row, meta) {
+              // Numéro d'ordre tient compte de la pagination.
+              return meta.row + meta.settings._iDisplayStart + 1;
+            },
+          },
+          { data: "district" },
+          { data: "site" },
+          { data: "sample_type" },
+          { data: "sample_nature" },
+          { data: "patient_identifier", render: renderCopyableId },
+          //{ data: 'sample_identifier', render: renderCopyableId },
+          { data: "collection_date", render: renderDateTime },
+          { data: "destination_lab" },
+          { data: "status", render: renderStatus },
+          // Colonnes non triables : whitelist du backend (mapClientColumnToDb)
+          // ne couvre pas rejection_comment, distance et les dates d'analyse
+          // / résultat car elles ne figurent pas dans le ORDER BY natif.
+          {
+            data: "rejection_comment",
+            visible: false,
+            defaultContent: "",
+            orderable: false,
+          },
+          { data: "reception_date", render: renderDateTime },
+          { data: "lab" },
+          { data: "lab_number", render: renderCopyableId },
+          {
+            data: "distance",
+            visible: false,
+            defaultContent: "",
+            className: "text-end",
+            orderable: false,
+          },
+          {
+            data: "analysis_completed_date",
+            visible: false,
+            render: renderDateTime,
+            orderable: false,
+          },
+          {
+            data: "analysis_released_date",
+            visible: false,
+            render: renderDateTime,
+            orderable: false,
+          },
+          {
+            data: "result_collection_date",
+            visible: false,
+            render: renderDateTime,
+            orderable: false,
+          },
+          {
+            data: "result_delivery_date",
+            visible: false,
+            render: renderDateTime,
+            orderable: false,
+          },
+          { data: "tat_days", visible: false, render: renderSla },
+          {
+            data: "actions",
+            orderable: false,
+            defaultContent: "",
+            render: renderActions,
+          },
+        ];
+
+        const table = $("#tab_sample").DataTable({
+          processing: true,
+          serverSide: true,
+          // Tri serveur via :sortKey / :sortDir injectés dans le ORDER BY
+          // natif de SampleRepository (whitelist côté controller).
+          ordering: true,
+          // Tri par défaut : Date Prélèvement (index 6) en DESC.
+          // Si tu réordonnes les colonnes, mets à jour l'index ici.
+          order: [[6, "desc"]],
+          // Pas de responsive : on gère le débordement via overflow-x:auto
+          // sur .card-body. Le bouton "+" de Responsive aurait masqué la
+          // colonne Actions ce qui n'était pas souhaité.
+          ajax: {
+            url: "sample/data",
+            data: function (d) {
+              d.region = $("#select_region").val() || null;
+              d.district = $("#select_district").val() || null;
+              d.site = $("#select_site").val() || null;
+              d.lab = $("#select_lab").val() || null;
+              d.start_date = isoFromFr($("#startDate").val());
+              d.end_date = isoFromFr($("#endDate").val());
+              d.search_text =
+                $("#searchText").val() || $("#quickSearch").val() || null;
+              d.only_rejected = $("#toggleRejected").is(":checked");
+              if ($("#toggleStuck").is(":checked")) d.stuck_days = 7;
+              // Arrays multi-valeurs en CSV : Spring accepte un
+              // `String` qu'on splittera côté controller. Évite
+              // d'avoir besoin de `traditional: true` qui casse
+              // la sérialisation des `columns[N][data]` de
+              // DataTables (transformés en `[object Object]`).
+              const statuses = $("#select_status").val() || [];
+              const types = $("#select_type").val() || [];
+              const natures = $("#select_nature").val() || [];
+              if (statuses.length) d.status = statuses.join(",");
+              if (types.length) d.sample_type = types.join(",");
+              if (natures.length) d.sample_nature = natures.join(",");
+            },
+            dataSrc: "data",
+          },
+          columns: columnsConfig,
+          pageLength: 25,
+          lengthMenu: [10, 25, 50, 100, 200],
+          dom: '<"row align-items-center mb-2"<"col-md-6"l><"col-md-6 text-end"i>>rtp',
+          language: {
+            processing: '<i class="fas fa-spinner fa-spin"></i> Chargement...',
+            lengthMenu: "Afficher _MENU_",
+            info: "_START_–_END_ sur _TOTAL_",
+            infoEmpty: "Aucun élément",
+            infoFiltered: " (filtré sur _MAX_)",
+            zeroRecords: "Aucun échantillon trouvé",
+            emptyTable: "Aucune donnée disponible",
+            paginate: { first: "«", last: "»", next: "›", previous: "‹" },
+          },
+        });
+
+        // Reload helpers
+        const reload = () => table.ajax.reload(updateActiveFilters);
+        window.reloadTable = reload;
+        const debouncedReload = debounce(reload, 300);
+        $(
+          "#select_region, #select_district, #select_site, #select_lab, #select_status, #select_type, #select_nature, #toggleStuck, #toggleRejected, #startDate, #endDate",
+        ).on("change", reload);
+        $("#searchText, #quickSearch").on("input", debouncedReload);
+        $("#btnReload").on("click", reload);
+        $("#btnResetAll").on("click", function () {
+          $("#searchText, #quickSearch, #startDate, #endDate").val("");
+          $(
+            "#select_region, #select_district, #select_site, #select_lab, #select_status, #select_type, #select_nature",
+          )
+            .val(null)
+            .trigger("change.select2");
+          $("#toggleStuck, #toggleRejected").prop("checked", false);
+          reload();
+        });
+
+        // Toggle collapse du panneau filtres avancés
+        $("#advancedFiltersHeader").on("click", function (e) {
+          if ($(e.target).closest("#btnResetAll").length) return;
+          $("#advancedFiltersPanel").toggleClass("collapsed");
+        });
+
+        // Column chooser
+        buildColumnChooser(table);
+
+        // Force le re-fetch AJAX au changement de tri.
+        // DataTables 1.11 en serverSide + custom `dom` peut omettre
+        // le redraw automatique au clic header. On l'attache une seule
+        // fois via .off() + .on() pour éviter l'empilement de listeners.
+        table.off("order.dt.sortFetch").on("order.dt.sortFetch", function () {
+          table.ajax.reload(null, false);
+        });
+
+        // Export CSV (uses existing /sample/csv with current filters)
+        $("#btnExportCsv").on("click", function () {
+          const params = new URLSearchParams();
+          const region = $("#select_region").val();
+          const district = $("#select_district").val();
+          const site = $("#select_site").val();
+          const lab = $("#select_lab").val();
+          if (region) params.set("region", region);
+          if (district) params.set("district", district);
+          if (site) params.set("site", site);
+          if (lab) params.set("lab", lab);
+          if ($("#startDate").val()) params.set("start", $("#startDate").val());
+          if ($("#endDate").val()) params.set("end", $("#endDate").val());
+          const search = $("#searchText").val() || $("#quickSearch").val();
+          if (search) params.set("patient_identifier", search);
+          window.location.href = "sample/csv?" + params.toString();
+        });
+
+        updateActiveFilters();
+      });
+
+      // jj/mm/aaaa → aaaa-mm-jj for the backend
+      function isoFromFr(s) {
+        if (!s) return null;
+        const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        return m ? m[3] + "-" + m[2] + "-" + m[1] : null;
+      }
+
+      function renderDateTime(data) {
+        if (!data) return "";
+        const d = new Date(data);
+        if (isNaN(d)) return data;
+        const pad = (n) => String(n).padStart(2, "0");
+        return (
+          pad(d.getDate()) +
+          "/" +
+          pad(d.getMonth() + 1) +
+          "/" +
+          d.getFullYear() +
+          " " +
+          pad(d.getHours()) +
+          ":" +
+          pad(d.getMinutes())
+        );
+      }
+
+      function renderStatus(data, type, row) {
+        if (!data) return "";
+        const code = (row.status_code || "").toLowerCase();
+        const cls = code ? "status-pill st-" + code : "status-pill";
+        return '<span class="' + cls + '">' + escapeHtml(data) + "</span>";
+      }
+
+      function renderSla(data, type, row) {
+        const days = row.tat_days != null ? row.tat_days : "—";
+        const color = row.sla_color || "green";
+        return (
+          '<span class="sla-badge sla-' +
+          color +
+          '" title="TAT — jours depuis la collecte">' +
+          days +
+          " j</span>"
+        );
+      }
+
+      function renderCopyableId(data, type) {
+        // For sorting/filtering, return raw value
+        if (type === "sort" || type === "filter" || type === "type")
+          return data || "";
+        if (!data) return "";
+        const v = escapeAttr(data);
+        return (
+          "" +
+          '<span class="copy-cell">' +
+          "<span>" +
+          escapeHtml(data) +
+          "</span>" +
+          '<button class="copy-btn" type="button" title="Copier" onclick="copyToClipboard(this, \'' +
+          v +
+          "')\">" +
+          '<i class="fas fa-copy"></i>' +
+          "</button>" +
+          "</span>"
+        );
+      }
+
+      function renderActions(data, type, row) {
+        const id = row.id;
+        let html =
+          "" +
+          '<div class="row-actions">' +
+          '<button class="btn-action" title="Voir détail" onclick="openDetail(' +
+          id +
+          ')"><i class="fas fa-eye"></i></button>';
+        if (window.CAN_EDIT_SAMPLES) {
+          html +=
+            "" +
+            '<a class="btn-action" style="color:#b45309" title="Modifier" href="sample/update/' +
+            id +
+            '"><i class="fas fa-pencil-alt"></i></a>' +
+            '<button class="btn-action" style="color:#dc2626" title="Supprimer" onclick="confirmDeleteSample(' +
+            id +
+            ')"><i class="fas fa-trash-alt"></i></button>';
+        }
+        html += "</div>";
+        return html;
+      }
+
+      function confirmDeleteSample(id) {
+        if (!confirm("Voulez-vous vraiment supprimer cet échantillon ?"))
+          return;
+        $.ajax({
+          url: "sample/delete/" + id,
+          type: "POST",
+          success: function () {
+            if (window.reloadTable) window.reloadTable();
+          },
+          error: function () {
+            alert("Erreur lors de la suppression");
+          },
+        });
+      }
+
+      function copyToClipboard(btn, text) {
+        if (!text) return;
+        const fallback = () => {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            document.execCommand("copy");
+          } catch (e) {}
+          document.body.removeChild(ta);
+        };
+        const done = () => {
+          const orig = btn.innerHTML;
+          btn.innerHTML = '<i class="fas fa-check text-success"></i>';
+          setTimeout(() => {
+            btn.innerHTML = orig;
+          }, 900);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard
+            .writeText(text)
+            .then(done)
+            .catch(() => {
+              fallback();
+              done();
+            });
+        } else {
+          fallback();
+          done();
+        }
+      }
+
+      function openDetail(id) {
+        $("#detailLoading").show();
+        $("#detailContent").hide();
+        $("#detailRejection").hide();
+        const modal = new bootstrap.Modal(
+          document.getElementById("sampleDetailModal"),
+        );
+        modal.show();
+
+        $.get("sample/" + id + "/details", function (payload) {
+          $("#detailLoading").hide();
+          $("#detailContent").show();
+          renderDetailFields(payload.sample);
+          if (payload.rejection) {
+            $("#detailRejection")
+              .html(
+                '<strong><i class="fas fa-ban"></i> Rejet :</strong> ' +
+                  escapeHtml(payload.rejection.comment || "") +
+                  (payload.rejection.rejectionDate
+                    ? ' <small class="text-muted">(' +
+                      renderDateTime(payload.rejection.rejectionDate) +
+                      ")</small>"
+                    : ""),
+              )
+              .show();
+          }
+          renderTimeline(payload.timeline || []);
+        }).fail(function () {
+          $("#detailLoading").hide();
+          $("#detailContent")
+            .html(
+              '<div class="alert alert-warning">Impossible de charger le détail.</div>',
+            )
+            .show();
+        });
+      }
+
+      function renderDetailFields(s) {
+        // Regroupements par sections : identification, parcours,
+        // kilométrage, acteurs. Affichage en grille condensée.
+        const sections = [
+          {
+            title: "Identification",
+            rows: [
+              ["ID échantillon", s.sampleIdentifier],
+              ["ID patient", s.patientIdentifier],
+              ["Type", s.sampleType],
+              ["Nature", s.sampleNature],
+              ["N° labo", s.labNumber],
+              ["Statut", s.statusDescription || s.status],
+            ],
+          },
+          {
+            title: "Localisation",
+            rows: [
+              ["Site demandeur", s.requesterSiteName],
+              ["Labo destination", s.destinationLabName],
+              ["Labo de référence", s.referenceLabName],
+              ["Hub", s.hubLabName],
+            ],
+          },
+          {
+            title: "Parcours (dates)",
+            rows: [
+              ["Prélèvement", renderDateTime(s.collectionDate)],
+              ["Récupération", renderDateTime(s.pickupDate)],
+              ["Dépôt hub", renderDateTime(s.deliverAtHubDate)],
+              ["Dépôt labo", renderDateTime(s.deliverAtLabDate)],
+              ["Acceptation hub", renderDateTime(s.acceptedAtHubDate)],
+              ["Acceptation labo", renderDateTime(s.acceptedAtLabDate)],
+              ["Analyse terminée", renderDateTime(s.analysisCompletedDate)],
+              ["Résultat disponible", renderDateTime(s.analysisReleasedDate)],
+              ["Collecte résultat", renderDateTime(s.resultCollectionDate)],
+              ["Livraison résultat", renderDateTime(s.resultDeliveryDate)],
+              ["Date de rejet", renderDateTime(s.rejectionDate)],
+            ],
+          },
+          {
+            title: "Kilométrage",
+            rows: [
+              ["Km début collecte", s.collectionStartMileage],
+              ["Km fin collecte", s.collectionEndMileage],
+              ["Distance collecte (km)", s.collectionDistance],
+              ["Km début résultat", s.resultStartMileage],
+              ["Km fin résultat", s.resultEndMileage],
+              ["Distance résultat (km)", s.resultDistance],
+            ],
+          },
+          {
+            title: "Acteurs",
+            rows: [
+              [
+                "Convoyeur",
+                s.conveyorName && s.conveyorName.trim()
+                  ? s.conveyorName +
+                    (s.conveyorLogin ? " (" + s.conveyorLogin + ")" : "")
+                  : null,
+              ],
+              [
+                "Collecteur résultat",
+                s.resultCollectorName && s.resultCollectorName.trim()
+                  ? s.resultCollectorName
+                  : null,
+              ],
+            ],
+          },
+        ];
+
+        const html = sections
+          .map(function (section) {
+            const items = section.rows
+              .filter((p) => p[1] !== null && p[1] !== undefined && p[1] !== "")
+              .map(
+                (p) =>
+                  '<div><div class="lbl">' +
+                  p[0] +
+                  "</div><div>" +
+                  escapeHtml(String(p[1])) +
+                  "</div></div>",
+              )
+              .join("");
+            if (!items) return ""; // section vide masquée
+            return (
+              "" +
+              '<div class="detail-section">' +
+              '<h6 class="detail-section-title">' +
+              section.title +
+              "</h6>" +
+              '<div class="detail-grid">' +
+              items +
+              "</div>" +
+              "</div>"
+            );
+          })
+          .join("");
+
+        $("#detailFields").html(html);
+      }
+
+      function renderTimeline(events) {
+        if (!events.length) {
+          $("#detailTimeline").html(
+            '<p class="text-muted small">Aucun événement enregistré.</p>',
+          );
+          return;
+        }
+        const html = events
+          .map(function (e) {
+            const meta = [];
+            if (e.appUserName && e.appUserName.trim())
+              meta.push("par " + escapeHtml(e.appUserName.trim()));
+            else if (e.appUserLogin)
+              meta.push("par " + escapeHtml(e.appUserLogin));
+            if (e.orgType) meta.push(escapeHtml(e.orgType));
+            if (e.mileage != null) meta.push(e.mileage + " km");
+            return (
+              "" +
+              '<div class="timeline-item">' +
+              '<div class="time">' +
+              renderDateTime(e.createdAt) +
+              "</div>" +
+              '<div class="event">' +
+              escapeHtml(humanizeEventType(e.eventType)) +
+              "</div>" +
+              (meta.length
+                ? '<div class="meta">' + meta.join(" · ") + "</div>"
+                : "") +
+              "</div>"
+            );
+          })
+          .join("");
+        $("#detailTimeline").html(html);
+      }
+
+      function humanizeEventType(t) {
+        if (!t) return "";
+        const map = {
+          COLLECT_SAMPLE_AT_FACILITY: "Collecte au site",
+          DELIVER_SAMPLE_AT_HUB: "Dépôt au hub",
+          COLLECT_SAMPLE_AT_HUB: "Collecte au hub",
+          DELIVER_SAMPLE_AT_LAB: "Dépôt au laboratoire",
+          ACCEPT_SAMPLE_AT_HUB: "Acceptation au hub",
+          ACCEPT_SAMPLE_AT_LAB: "Acceptation au laboratoire",
+          REJECT_SAMPLE_AT_HUB: "Rejet au hub",
+          REJECT_SAMPLE_AT_LAB: "Rejet au laboratoire",
+          COLLECT_RESULT_AT_LAB: "Collecte du résultat",
+          DELIVER_RESULT_AT_FACILITY: "Livraison du résultat au site",
+        };
+        return map[t] || t;
+      }
+
+      function buildColumnChooser(table) {
+        const $menu = $("#colChooser").empty();
+        table.columns().every(function (i) {
+          const col = this;
+          const $th = $(col.header());
+          if ($th.data("col") === "actions") return;
+          const id = "col_" + i;
+          $menu.append(
+            "" +
+              '<li><label class="dropdown-item d-flex align-items-center" style="cursor:pointer">' +
+              '<input type="checkbox" class="form-check-input me-2 mt-0" id="' +
+              id +
+              '" ' +
+              (col.visible() ? "checked" : "") +
+              " />" +
+              "<span>" +
+              $th.text().trim() +
+              "</span>" +
+              "</label></li>",
+          );
+          $menu.find("#" + id).on("change", function () {
+            col.visible(this.checked);
+            persistColumnPrefs(table);
+          });
+        });
+        try {
+          const prefs = JSON.parse(
+            localStorage.getItem("samplesColPrefs") || "{}",
+          );
+          Object.entries(prefs).forEach(function (pair) {
+            const i = parseInt(pair[0], 10);
+            const visible = pair[1];
+            const col = table.column(i);
+            if (col) {
+              col.visible(visible);
+              $("#col_" + i).prop("checked", visible);
+            }
+          });
+        } catch (e) {
+          /* ignore */
+        }
+      }
+
+      function persistColumnPrefs(table) {
+        const prefs = {};
+        table.columns().every(function (i) {
+          prefs[i] = this.visible();
+        });
+        localStorage.setItem("samplesColPrefs", JSON.stringify(prefs));
+      }
+
+      function updateActiveFilters() {
+        const pills = [];
+        const addPill = (label, clearFn) =>
+          pills.push({ label: label, clearFn: clearFn });
+        if ($("#searchText").val())
+          addPill("Recherche : " + $("#searchText").val(), () =>
+            $("#searchText").val(""),
+          );
+        if ($("#startDate").val() || $("#endDate").val())
+          addPill(
+            "Période : " +
+              ($("#startDate").val() || "…") +
+              " → " +
+              ($("#endDate").val() || "…"),
+            () => {
+              $("#startDate, #endDate").val("");
+            },
+          );
+        $(
+          "#select_region option:selected, #select_district option:selected, #select_site option:selected, #select_lab option:selected",
+        ).each(function () {
+          if (this.value) addPill($(this).text(), null);
+        });
+        const statuses = $("#select_status").select2("data") || [];
+        statuses.forEach((s) => addPill("Statut : " + s.text, null));
+        const types = $("#select_type").select2("data") || [];
+        types.forEach((t) => addPill("Type : " + t.text, null));
+        const natures = $("#select_nature").select2("data") || [];
+        natures.forEach((n) => addPill("Nature : " + n.text, null));
+        if ($("#toggleStuck").is(":checked"))
+          addPill("En retard", () => $("#toggleStuck").prop("checked", false));
+        if ($("#toggleRejected").is(":checked"))
+          addPill("Rejetés", () => $("#toggleRejected").prop("checked", false));
+
+        const bar = $("#activeFiltersBar").empty();
+        pills.forEach(function (p) {
+          const $p = $('<span class="pill"></span>').text(p.label);
+          if (p.clearFn) {
+            const $btn = $(
+              '<button type="button" title="Retirer">×</button>',
+            ).on("click", function () {
+              p.clearFn();
+              window.reloadTable();
+            });
+            $p.append(" ").append($btn);
+          }
+          bar.append($p);
+        });
+      }
+
+      function debounce(fn, ms) {
+        let t;
+        return function () {
+          const args = arguments,
+            ctx = this;
+          clearTimeout(t);
+          t = setTimeout(function () {
+            fn.apply(ctx, args);
+          }, ms);
+        };
+      }
+
+      function escapeHtml(str) {
+        if (str == null) return "";
+        return String(str).replace(/[&<>"']/g, function (c) {
+          return {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          }[c];
+        });
+      }
+      function escapeAttr(str) {
+        return escapeHtml(str).replace(/`/g, "&#96;");
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,484 @@
+<!DOCTYPE HTML>
+<html lang="fr" xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:th="http://www.thymeleaf.org"
+	xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity6">
+
+<head th:fragment="head">
+<title>LSTracker – Lab Sample Tracker</title>
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport"
+	content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<meta name="description"
+	content="Suivi et traçabilité des échantillons – LSTracker" />
+<meta name="author" content="Côte d'Ivoire I-TECH" />
+
+<link rel="icon" type="image/x-icon" th:href="@{/favicon.ico}" />
+
+<link rel="stylesheet" th:href="@{/webjars/bootstrap/5.1.3/css/bootstrap.min.css}" />
+<link rel="stylesheet" th:href="@{/webjars/jquery-ui/1.13.2/jquery-ui.min.css}" />
+<link rel="stylesheet" th:href="@{/webjars/select2/4.0.13/css/select2.min.css}" />
+<link rel="stylesheet" th:href="@{/DataTables/datatables.min.css}" />
+<link rel="stylesheet" th:href="@{/css/styles.css}" />
+<link rel="stylesheet" th:href="@{/css/custom.css}" />
+
+<style>
+/* ===== Navbar v2 ===== */
+.ls-navbar {
+	position: sticky;
+	top: 0;
+	z-index: 1030;
+	background: rgba(255, 255, 255, 0.92);
+	backdrop-filter: saturate(180%) blur(10px);
+	-webkit-backdrop-filter: saturate(180%) blur(10px);
+	border-bottom: 1px solid #e6e9f3;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, .04);
+	padding: .5rem 0;
+}
+
+.ls-navbar .container-fluid {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+/* Brand */
+.ls-brand {
+	display: flex;
+	align-items: center;
+	gap: .65rem;
+	text-decoration: none;
+	color: inherit;
+	flex-shrink: 0;
+}
+.ls-brand img {
+	width: 34px;
+	height: 34px;
+	object-fit: contain;
+	border-radius: .35rem;
+}
+.ls-brand .brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+.ls-brand .brand-title {
+	font-weight: 700;
+	font-size: 1.05rem;
+	color: #233B8B;
+	letter-spacing: .3px;
+}
+.ls-brand .brand-context {
+	font-size: .72rem;
+	color: #6b7280;
+}
+.ls-brand .brand-version {
+	font-size: .65rem;
+	color: #6b7280;
+	background: #f1f5f9;
+	border-radius: 999px;
+	padding: .1rem .45rem;
+	margin-left: .35rem;
+	font-weight: 600;
+}
+
+/* Menu items */
+.ls-menu {
+	display: flex;
+	align-items: center;
+	gap: .15rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	flex: 1;
+}
+@media (max-width: 991.98px) {
+	.ls-menu { display: none; }
+}
+.ls-menu .nav-item .ls-link {
+	display: inline-flex;
+	align-items: center;
+	gap: .4rem;
+	padding: .45rem .85rem;
+	font-size: .88rem;
+	font-weight: 500;
+	color: #374151;
+	border-radius: .5rem;
+	text-decoration: none;
+	transition: background .15s, color .15s;
+	white-space: nowrap;
+}
+.ls-menu .nav-item .ls-link:hover {
+	background: #eef2ff;
+	color: #233B8B;
+}
+.ls-menu .nav-item .ls-link.active {
+	background: linear-gradient(135deg, #233B8B 0%, #4f46e5 100%);
+	color: #fff;
+	box-shadow: 0 2px 6px rgba(35, 59, 139, .25);
+}
+.ls-menu .nav-item .ls-link.active i { color: #fff; }
+.ls-menu .nav-item .ls-link i { font-size: .8rem; color: #6b7280; }
+
+/* Dropdowns */
+.ls-menu .dropdown-menu {
+	border: 1px solid #e6e9f3;
+	border-radius: .65rem;
+	box-shadow: 0 12px 28px rgba(0, 0, 0, .08);
+	padding: .35rem;
+	min-width: 240px;
+}
+.ls-menu .dropdown-menu .dropdown-item {
+	padding: .45rem .65rem;
+	border-radius: .35rem;
+	font-size: .85rem;
+	color: #374151;
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+}
+.ls-menu .dropdown-menu .dropdown-item i {
+	width: 1.1rem;
+	color: #6b7280;
+	font-size: .85rem;
+}
+.ls-menu .dropdown-menu .dropdown-item:hover {
+	background: #eef2ff;
+	color: #233B8B;
+}
+.ls-menu .dropdown-menu .dropdown-item:hover i { color: #233B8B; }
+.ls-menu .dropdown-menu .dropdown-header {
+	font-size: .68rem;
+	text-transform: uppercase;
+	font-weight: 700;
+	color: #9ca3af;
+	letter-spacing: .05em;
+	padding: .35rem .65rem .15rem;
+}
+.ls-menu .dropdown-menu .dropdown-divider { margin: .35rem .25rem; }
+
+/* User dropdown (right of navbar) — same look as main menu dropdowns */
+.ls-user-menu {
+	border: 1px solid #e6e9f3;
+	border-radius: .65rem;
+	box-shadow: 0 12px 28px rgba(0, 0, 0, .08);
+	padding: .35rem;
+	min-width: 220px;
+}
+.ls-user-menu .dropdown-item {
+	padding: .45rem .65rem;
+	border-radius: .35rem;
+	font-size: .85rem;
+	color: #374151;
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+}
+.ls-user-menu .dropdown-item i { width: 1.1rem; color: #6b7280; font-size: .85rem; }
+.ls-user-menu .dropdown-item:hover { background: #eef2ff; color: #233B8B; }
+.ls-user-menu .dropdown-item:hover i { color: #233B8B; }
+.ls-user-menu .dropdown-divider { margin: .35rem .25rem; }
+
+/* User pill */
+.ls-actions {
+	display: flex;
+	align-items: center;
+	gap: .5rem;
+	flex-shrink: 0;
+	margin-left: auto;
+}
+.ls-user {
+	display: inline-flex;
+	align-items: center;
+	gap: .5rem;
+	padding: .25rem .35rem .25rem .25rem;
+	border-radius: 999px;
+	background: #f8fafc;
+	border: 1px solid #e6e9f3;
+	color: #1f2937;
+	text-decoration: none;
+	cursor: pointer;
+	transition: background .15s;
+}
+.ls-user:hover { background: #eef2ff; color: #233B8B; }
+.ls-user .avatar {
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: linear-gradient(135deg, #233B8B 0%, #4f46e5 100%);
+	color: #fff;
+	font-weight: 700;
+	font-size: .8rem;
+}
+.ls-user .user-name {
+	font-size: .85rem;
+	font-weight: 500;
+}
+@media (max-width: 768px) {
+	.ls-user .user-name { display: none; }
+}
+.ls-user::after {
+	content: '';
+	display: inline-block;
+	width: 0; height: 0;
+	border-left: 4px solid transparent;
+	border-right: 4px solid transparent;
+	border-top: 4px solid #6b7280;
+	margin-right: .35rem;
+}
+
+/* Burger button (mobile) */
+.ls-burger {
+	display: none;
+	background: none;
+	border: 1px solid #e6e9f3;
+	border-radius: .45rem;
+	width: 38px;
+	height: 38px;
+	color: #233B8B;
+	font-size: 1.1rem;
+}
+.ls-burger:hover { background: #eef2ff; }
+@media (max-width: 991.98px) {
+	.ls-burger { display: inline-flex; align-items: center; justify-content: center; }
+}
+
+/* Mobile offcanvas */
+.ls-offcanvas-body { padding: 0; }
+.ls-offcanvas-body .nav-link {
+	padding: .65rem 1rem;
+	border-radius: 0;
+	color: #374151;
+	display: flex;
+	align-items: center;
+	gap: .6rem;
+	border-left: 3px solid transparent;
+}
+.ls-offcanvas-body .nav-link:hover {
+	background: #f8fafc;
+	color: #233B8B;
+}
+.ls-offcanvas-body .nav-link.active {
+	border-left-color: #233B8B;
+	background: #eef2ff;
+	color: #233B8B;
+	font-weight: 600;
+}
+.ls-offcanvas-body .nav-link i { width: 1.25rem; color: #6b7280; }
+.ls-offcanvas-body .nav-link.active i { color: #233B8B; }
+.ls-offcanvas-body .nav-section {
+	font-size: .7rem;
+	text-transform: uppercase;
+	font-weight: 700;
+	color: #9ca3af;
+	letter-spacing: .05em;
+	padding: 1rem 1rem .35rem;
+}
+</style>
+
+<base href="/" />
+</head>
+
+<body>
+<div th:fragment="header">
+
+<nav class="ls-navbar" role="navigation" aria-label="Menu principal">
+	<div class="container-fluid">
+
+		<!-- Brand -->
+		<a class="ls-brand" th:href="@{/}">
+			<img th:src="@{/img/logo-sm.jpg}" alt="Logo LSTracker"/>
+			<div class="brand-text">
+				<span class="brand-title">
+					LSTracker
+					<span class="brand-version" th:text="${appVersion}">v2.0.0</span>
+				</span>
+				<span class="brand-context" th:if="${content != null}" th:text="${content}">Module</span>
+			</div>
+		</a>
+
+		<!-- Burger (mobile) -->
+		<button class="ls-burger" type="button"
+			data-bs-toggle="offcanvas" data-bs-target="#mobileMenu"
+			aria-controls="mobileMenu" aria-label="Ouvrir le menu">
+			<i class="fas fa-bars"></i>
+		</button>
+
+		<!-- Desktop menu -->
+		<ul class="ls-menu" sec:authorize="isAuthenticated()">
+			<li class="nav-item">
+				<a th:href="@{/}" class="ls-link" th:classappend="${module}=='home' ? ' active' : ''">
+					<i class="fas fa-chart-pie"></i> Tableau de bord
+				</a>
+			</li>
+			<li class="nav-item">
+				<a th:href="@{/sample}" class="ls-link" th:classappend="${module}=='sample' ? ' active' : ''">
+					<i class="fas fa-vials"></i> Échantillons
+				</a>
+			</li>
+			<li class="nav-item">
+				<a th:href="@{/report}" class="ls-link" th:classappend="${module}=='report' ? ' active' : ''">
+					<i class="fas fa-file-pdf"></i> Rapports
+				</a>
+			</li>
+
+			<!-- Administration : dropdown ADMIN -->
+			<li class="nav-item dropdown" sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')">
+				<a class="ls-link dropdown-toggle"
+					th:classappend="${module}=='setting' or ${module}=='user' or ${module}=='org'
+						or ${module}=='lab' or ${module}=='circuit' or ${module}=='site'
+						or ${module}=='region' or ${module}=='district'
+						or ${module}=='sampletype' or ${module}=='samplestatus' or ${module}=='samplerejectiontype'
+						or ${module}=='approle' or ${module}=='convoyeur'
+						? ' active' : ''"
+					href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"
+					onclick="return false;">
+					<i class="fas fa-cog"></i> Administration
+				</a>
+				<ul class="dropdown-menu">
+					<li><h6 class="dropdown-header"><i class="fas fa-users-cog"></i> Utilisateurs</h6></li>
+					<li><a class="dropdown-item" th:href="@{/appuser}"><i class="fas fa-users"></i> Utilisateurs</a></li>
+					<li><hr class="dropdown-divider"/></li>
+					<li><h6 class="dropdown-header"><i class="fas fa-sitemap"></i> Organisation</h6></li>
+					<li><a class="dropdown-item" th:href="@{/region}"><i class="fas fa-globe-africa"></i> Régions</a></li>
+					<li><a class="dropdown-item" th:href="@{/district}"><i class="fas fa-map"></i> Districts</a></li>
+					<li><a class="dropdown-item" th:href="@{/site}"><i class="fas fa-clinic-medical"></i> Sites de collecte</a></li>
+					<li><hr class="dropdown-divider"/></li>
+					<li><h6 class="dropdown-header"><i class="fas fa-flask"></i> Laboratoires &amp; circuits</h6></li>
+					<li><a class="dropdown-item" th:href="@{/lab}"><i class="fas fa-flask"></i> Laboratoires</a></li>
+					<li><a class="dropdown-item" th:href="@{/circuit}"><i class="fas fa-route"></i> Circuits</a></li>
+				</ul>
+			</li>
+
+			<!-- Aide : dropdown (Manuel utilisateur + Procédures) -->
+			<li class="nav-item dropdown">
+				<a class="ls-link dropdown-toggle"
+					th:classappend="${module}=='help' ? ' active' : ''"
+					href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"
+					onclick="return false;">
+					<i class="fas fa-question-circle"></i> Aide
+				</a>
+				<ul class="dropdown-menu">
+					<li><a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+						<i class="fas fa-book"></i> Manuel utilisateur
+						<span class="badge bg-secondary ms-1" style="font-size:.65rem;">Bientôt</span>
+					</a></li>
+					<li><a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+						<i class="fas fa-clipboard-list"></i> Procédures
+						<span class="badge bg-secondary ms-1" style="font-size:.65rem;">Bientôt</span>
+					</a></li>
+				</ul>
+			</li>
+
+			<!-- Liens publics si non authentifié (sur la page de login) -->
+		</ul>
+
+		<ul class="ls-menu" sec:authorize="not isAuthenticated()">
+			<li class="nav-item"><a class="ls-link" th:href="@{/legal/terms}" target="_blank">CGU</a></li>
+			<li class="nav-item"><a class="ls-link" th:href="@{/legal/privacy}" target="_blank">Confidentialité</a></li>
+		</ul>
+
+		<!-- Actions à droite -->
+		<div class="ls-actions" sec:authorize="isAuthenticated()">
+			<!-- User dropdown -->
+			<div class="dropdown">
+				<a class="ls-user" id="userDropdownToggle" href="#"
+					role="button" data-bs-toggle="dropdown" aria-expanded="false">
+					<span class="avatar"
+						th:text="${#strings.substring((#authentication?.name ?: 'U'),0,1).toUpperCase()}">U</span>
+					<span class="user-name" sec:authentication="principal.username">utilisateur</span>
+				</a>
+				<ul class="dropdown-menu dropdown-menu-end ls-user-menu">
+					<li><a class="dropdown-item" th:href="@{/appuser/profile/edit}">
+						<i class="fas fa-user"></i> Mon profil
+					</a></li>
+					<li><a class="dropdown-item" th:href="@{/appuser/profile/password}">
+						<i class="fas fa-key"></i> Changer mot de passe
+					</a></li>
+					<li><hr class="dropdown-divider"/></li>
+					<li>
+						<form th:action="@{/logout}" method="post" class="px-2 pb-1">
+							<button type="submit" class="btn btn-sm btn-outline-danger w-100">
+								<i class="fas fa-sign-out-alt me-1"></i> Se déconnecter
+							</button>
+						</form>
+					</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+</nav>
+
+<!-- Mobile offcanvas -->
+<div class="offcanvas offcanvas-start" tabindex="-1" id="mobileMenu" aria-labelledby="mobileMenuLabel">
+	<div class="offcanvas-header">
+		<h5 class="offcanvas-title" id="mobileMenuLabel">
+			<i class="fas fa-vials text-primary"></i> LSTracker
+		</h5>
+		<button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
+	</div>
+	<div class="offcanvas-body ls-offcanvas-body">
+		<div sec:authorize="isAuthenticated()">
+			<a th:href="@{/}" class="nav-link" th:classappend="${module}=='home' ? ' active' : ''">
+				<i class="fas fa-chart-pie"></i> Tableau de bord
+			</a>
+			<a th:href="@{/sample}" class="nav-link" th:classappend="${module}=='sample' ? ' active' : ''">
+				<i class="fas fa-vials"></i> Échantillons
+			</a>
+			<a th:href="@{/report}" class="nav-link" th:classappend="${module}=='report' ? ' active' : ''">
+				<i class="fas fa-file-pdf"></i> Rapports
+			</a>
+
+			<div class="nav-section">Aide</div>
+			<a href="#" class="nav-link disabled" tabindex="-1" aria-disabled="true">
+				<i class="fas fa-book"></i> Manuel utilisateur
+				<span class="badge bg-secondary ms-1" style="font-size:.65rem;">Bientôt</span>
+			</a>
+			<a href="#" class="nav-link disabled" tabindex="-1" aria-disabled="true">
+				<i class="fas fa-clipboard-list"></i> Procédures
+				<span class="badge bg-secondary ms-1" style="font-size:.65rem;">Bientôt</span>
+			</a>
+
+			<div sec:authorize="hasAnyRole('ADMIN','SUPER_ADMIN')">
+				<div class="nav-section">Utilisateurs &amp; rôles</div>
+				<a th:href="@{/appuser}" class="nav-link"><i class="fas fa-users"></i> Utilisateurs</a>
+				<a th:href="@{/approle}" class="nav-link"><i class="fas fa-user-shield"></i> Rôles</a>
+				<a th:href="@{/convoyeur}" class="nav-link"><i class="fas fa-motorcycle"></i> Convoyeurs</a>
+
+				<div class="nav-section">Organisation</div>
+				<a th:href="@{/region}" class="nav-link"><i class="fas fa-globe-africa"></i> Régions</a>
+				<a th:href="@{/district}" class="nav-link"><i class="fas fa-map"></i> Districts</a>
+				<a th:href="@{/site}" class="nav-link"><i class="fas fa-clinic-medical"></i> Sites</a>
+
+				<div class="nav-section">Laboratoires &amp; circuits</div>
+				<a th:href="@{/lab}" class="nav-link"><i class="fas fa-flask"></i> Laboratoires</a>
+				<a th:href="@{/circuit}" class="nav-link"><i class="fas fa-route"></i> Circuits</a>
+
+				<div class="nav-section">Référentiels</div>
+				<a th:href="@{/sampletype}" class="nav-link"><i class="fas fa-vial"></i> Types d'échantillon</a>
+				<a th:href="@{/samplestatus}" class="nav-link"><i class="fas fa-tasks"></i> Statuts</a>
+				<a th:href="@{/samplerejectiontype}" class="nav-link"><i class="fas fa-ban"></i> Types de rejet</a>
+			</div>
+
+			<div class="nav-section">Compte</div>
+			<a th:href="@{/appuser/profile/edit}" class="nav-link"><i class="fas fa-user"></i> Mon profil</a>
+			<a th:href="@{/appuser/profile/password}" class="nav-link"><i class="fas fa-key"></i> Changer mot de passe</a>
+			<form th:action="@{/logout}" method="post" class="px-3 py-2">
+				<button type="submit" class="btn btn-outline-danger w-100">
+					<i class="fas fa-sign-out-alt me-1"></i> Se déconnecter
+				</button>
+			</form>
+		</div>
+	</div>
+</div>
+
+</div>
+
+<!-- Scripts -->
+<script th:src="@{/webjars/jquery/3.6.0/jquery.min.js}"></script>
+<script th:src="@{/webjars/jquery-ui/1.13.2/jquery-ui.min.js}"></script>
+<script th:src="@{/webjars/bootstrap/5.1.3/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/webjars/font-awesome/5.15.4/js/all.js}"></script>
+<script th:src="@{/DataTables/datatables.min.js}"></script>
+<script th:src="@{/js/scripts.js}"></script>
+</body>
+</html>

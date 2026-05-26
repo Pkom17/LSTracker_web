@@ -1,0 +1,118 @@
+# =====================================================================
+# LSTracker — déploiement DEMO
+# Configuration plus modeste que la prod (poids et perf).
+# Lance : docker compose --env-file .env.demo -f docker-compose.demo.yml up -d
+# =====================================================================
+
+name: lst_demo
+
+networks:
+  lst_demo_net:
+    driver: bridge
+
+volumes:
+  trackerdb_demo:
+
+services:
+
+  # -------------------------------------------------------------------
+  # PostgreSQL 14 — démo
+  # Mémoire : 5 GiB (limit) / 2 GiB (reservation)
+  # CPU     : 2 cores (limit)
+  # Tuning  : monté via postgresql.demo.conf.
+  # -------------------------------------------------------------------
+  tracker_db:
+    image: postgres:14
+    container_name: lst_demo_db
+    restart: unless-stopped
+    networks:
+      - lst_demo_net
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${TZ:-Africa/Abidjan}
+    volumes:
+      - trackerdb_demo:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/01_init_db.sql:ro
+      - ./config/postgres/postgresql.demo.conf:/etc/postgresql/postgresql.conf:ro
+    command:
+      - "postgres"
+      - "-c"
+      - "config_file=/etc/postgresql/postgresql.conf"
+    ports:
+      # Tunnel SSH/local uniquement.
+      - "127.0.0.1:5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 5G
+        reservations:
+          cpus: "0.5"
+          memory: 2G
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # -------------------------------------------------------------------
+  # App Spring Boot — démo
+  # Mémoire : 5 GiB (limit) / 3 GiB (reservation)
+  #   JVM heap ~3.75 GiB max (75% de 5 GiB).
+  # CPU     : 2 cores (limit)
+  # -------------------------------------------------------------------
+  tracker_app:
+    image: ${APP_IMAGE:-ghcr.io/itech-ci/labsampletracker:latest}
+    container_name: lst_demo_app
+    restart: unless-stopped
+    networks:
+      - lst_demo_net
+    depends_on:
+      tracker_db:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Africa/Abidjan}
+      SERVER_PORT: 9200
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tracker_db:5432/${POSTGRES_DB}?currentSchema=sample_tracker
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_POOL_MAX: ${DB_POOL_MAX:-15}
+      DB_POOL_MIN: ${DB_POOL_MIN:-3}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-43200}
+      JWT_REFRESH_TTL_DAYS: ${JWT_REFRESH_TTL_DAYS:-60}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp"
+    ports:
+      # Port public DEMO : 9201 (mappé sur le port interne 9200).
+      - "${DEMO_PORT:-9201}:9200"
+    volumes:
+      - ./logs/demo:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 5G
+        reservations:
+          cpus: "0.5"
+          memory: 3G
+    logging:
+      driver: json-file
+      options:
+        max-size: "30m"
+        max-file: "5"

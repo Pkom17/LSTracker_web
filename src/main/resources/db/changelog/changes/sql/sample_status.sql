@@ -1,0 +1,15 @@
+insert into sample_tracker.sample_status values
+(nextval('sample_tracker.sample_status_id_seq'),'ON_TRANSIT','EN TRANSIT', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'RECEIVED_AT_HUB','TRANSMIS	LABO RELAIS', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'RECEIVED_AT_REFERENCE_LAB','TRANSMIS LABO REFERENCE', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'RECEIVED_AT_DISTRICT_LAB','TRANSMIS LABO DISTRICT', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'RECEIVED_AT_TB_LAB','TRANSMIS LABO CAT', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'ACCEPTED_AT_HUB','ACCEPTE LABO RELAIS', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'ACCEPTED_AT_REFERENCE_LAB','ACCEPTE LABO REFERENCE', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'ACCEPTED_AT_DISTRICT_LAB','ACCEPTE LABO DISTRICT', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'ACCEPTED_AT_TB_LAB','ACCEPTE LABO CAT', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'ANALYSIS_DONE','ANALYSE TERMINEE', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'NON_CONFORM','NON CONFORME', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'ANALYSIS_FAILED','ECHEC ANALYSE', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'RESULT_COLLECTED','RESULTAT COLLECTE', now()),
+(nextval('sample_tracker.sample_status_id_seq'),'RESULT_ON_SITE','RESULTAT SUR SITE', now());

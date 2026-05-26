@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:th="http://www.thymeleaf.org"
+	xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity6">
+
+<head th:replace="~{fragments/header :: head}">
+<title>Modifier un échantillon</title>
+</head>
+
+<body class="sb-nav-fixed">
+
+<style>
+/* ===== Page layout ===== */
+.edit-wrapper {
+	max-width: 1100px;
+	margin: 0 auto;
+	padding-bottom: 6rem; /* room for sticky save bar */
+}
+
+/* ===== Page header bar ===== */
+.edit-header {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	align-items: center;
+	justify-content: space-between;
+	padding: 1rem 1.25rem;
+	background: #fff;
+	border: 1px solid #e6e9f3;
+	border-radius: .75rem;
+	margin-bottom: 1rem;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, .03);
+}
+.edit-header h1 {
+	font-size: 1.1rem;
+	margin: 0;
+	color: #1f2937;
+	font-weight: 600;
+}
+.edit-header h1 i { color: #4f46e5; margin-right: .35rem; }
+.edit-header .sample-meta {
+	font-size: .75rem;
+	color: #6b7280;
+}
+.edit-header .sample-meta strong { color: #1f2937; }
+.edit-header .header-actions { display: flex; gap: .5rem; }
+
+/* ===== Status banner ===== */
+.status-banner {
+	display: inline-flex;
+	align-items: center;
+	gap: .35rem;
+	padding: .25rem .7rem;
+	border-radius: 1rem;
+	font-size: .75rem;
+	font-weight: 600;
+	background: #eef2ff;
+	color: #3730a3;
+}
+
+/* ===== Section cards ===== */
+.section-card {
+	background: #fff;
+	border: 1px solid #e6e9f3;
+	border-radius: .75rem;
+	margin-bottom: 1rem;
+	overflow: hidden;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, .03);
+}
+.section-card .section-header {
+	background: #f8fafc;
+	padding: .75rem 1.25rem;
+	border-bottom: 1px solid #e6e9f3;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	cursor: pointer;
+	user-select: none;
+}
+.section-card .section-header h2 {
+	font-size: .95rem;
+	margin: 0;
+	color: #1f2937;
+	font-weight: 600;
+}
+.section-card .section-header h2 .step-num {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.5rem;
+	height: 1.5rem;
+	border-radius: 50%;
+	background: #4f46e5;
+	color: #fff;
+	font-size: .7rem;
+	margin-right: .5rem;
+}
+.section-card .section-body {
+	padding: 1.25rem;
+}
+.section-card.collapsed .section-body { display: none; }
+.section-card .toggle-icon { transition: transform .2s; color: #6b7280; }
+.section-card.collapsed .toggle-icon { transform: rotate(-90deg); }
+
+/* ===== Form fields ===== */
+.field { margin-bottom: .75rem; }
+.field label {
+	display: block;
+	font-size: .72rem;
+	text-transform: uppercase;
+	font-weight: 600;
+	color: #6b7280;
+	letter-spacing: .03em;
+	margin-bottom: .25rem;
+}
+.field label .req { color: #dc2626; }
+.field .hint {
+	display: block;
+	font-size: .7rem;
+	color: #9ca3af;
+	margin-top: .15rem;
+}
+
+.field .input-with-action {
+	position: relative;
+}
+.field .input-with-action input,
+.field .input-with-action select {
+	padding-right: 2.25rem;
+}
+.field .input-action {
+	position: absolute;
+	right: .35rem;
+	top: 50%;
+	transform: translateY(-50%);
+	background: none;
+	border: none;
+	color: #6b7280;
+	padding: .25rem .35rem;
+	border-radius: .25rem;
+	cursor: pointer;
+}
+.field .input-action:hover { background: #f3f4f6; color: #1f2937; }
+
+/* Readonly meta block */
+.meta-readonly {
+	background: #f8fafc;
+	border: 1px dashed #e6e9f3;
+	border-radius: .5rem;
+	padding: .75rem 1rem;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: .25rem 1rem;
+	font-size: .8rem;
+	color: #6b7280;
+}
+.meta-readonly .lbl { font-weight: 600; color: #374151; }
+
+/* ===== Sticky save bar ===== */
+.save-bar {
+	background: #f8fafc;
+	border-top: 1px solid #e6e9f3;
+	padding: .85rem 1.25rem;
+	margin-top: .5rem;
+	border-radius: .5rem;
+	display: flex;
+	justify-content: flex-end;
+	gap: .5rem;
+}
+
+/* ===== Rejection section emphasis ===== */
+.section-card.section-rejection .section-header { background: #fef2f2; }
+.section-card.section-rejection .section-header h2 .step-num { background: #dc2626; }
+
+/* ===== Validation feedback ===== */
+.is-invalid + .invalid-feedback { display: block; }
+
+/* ===== Alerts ===== */
+.alert-flash {
+	border-radius: .5rem;
+	font-size: .9rem;
+}
+
+/* Select2 height tweak to match form-control-sm */
+.select2-container--default .select2-selection--single {
+	height: calc(1.5em + .75rem + 2px) !important;
+	display: flex !important;
+	align-items: center !important;
+}
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+	height: 100% !important;
+	top: 50% !important;
+	transform: translateY(-50%) !important;
+	right: .5rem !important;
+}
+
+/* Responsive: single column on small screens */
+@media (max-width: 768px) {
+	.row .col-md-6 { margin-bottom: 0; }
+}
+</style>
+
+	<div class="d-flex" id="wrapper">
+		<div id="page-content-wrapper">
+
+			<div th:insert="~{fragments/header :: header(content='Modifier un échantillon', module='sample')}"></div>
+
+			<div class="container-fluid py-3 edit-wrapper">
+
+				<!-- ===== Page header ===== -->
+				<div class="edit-header">
+					<div>
+						<h1><i class="fas fa-vial"></i>Modifier l'échantillon</h1>
+						<div class="sample-meta mt-1">
+							<span>ID :
+								<strong th:text="${sample?.id}">—</strong>
+								<button type="button" class="btn-link btn-sm p-0 ms-1"
+									th:attr="data-copy=${sample?.id}"
+									title="Copier l'ID" onclick="copyValue(this)">
+									<i class="fas fa-copy"></i>
+								</button>
+							</span>
+							<span class="mx-2">·</span>
+							<span>Patient :
+								<strong th:text="${sample?.patientIdentifier} ?: '—'">—</strong>
+								<button type="button" class="btn-link btn-sm p-0 ms-1"
+									th:if="${sample?.patientIdentifier}"
+									th:attr="data-copy=${sample?.patientIdentifier}"
+									title="Copier l'ID patient" onclick="copyValue(this)">
+									<i class="fas fa-copy"></i>
+								</button>
+							</span>
+						</div>
+					</div>
+
+					<div class="header-actions">
+						<a th:href="@{/sample}" class="btn btn-sm btn-outline-secondary">
+							<i class="fas fa-arrow-left"></i> Retour à la liste
+						</a>
+						<button type="button" class="btn btn-sm btn-outline-danger"
+							sec:authorize="hasAnyRole('ADMIN', 'SUPER_ADMIN')"
+							th:attr="data-id=${sample?.id}"
+							onclick="confirmDelete(event,this)">
+							<i class="fas fa-trash-alt"></i> Supprimer
+						</button>
+					</div>
+				</div>
+
+				<!-- Flash messages -->
+				<div th:if="${message_error != null}" class="alert alert-danger alert-flash" th:text="${message_error}"></div>
+				<div th:if="${message_success != null}" class="alert alert-success alert-flash" th:text="${message_success}"></div>
+
+				<form th:object="${sample}" th:action="@{'/sample/update/'+${sample?.id}}" method="post" id="editForm" novalidate>
+					<input type="hidden" th:field="*{id}" />
+					<input type="hidden" th:field="*{createdAt}" />
+					<input type="hidden" th:field="*{lastupdatedAt}" />
+
+					<!-- ============ SECTION 1 : GÉNÉRAL ============ -->
+					<section class="section-card" data-section="general">
+						<div class="section-header" onclick="toggleSection(this)">
+							<h2><span class="step-num">1</span>Informations générales</h2>
+							<i class="fas fa-chevron-down toggle-icon"></i>
+						</div>
+						<div class="section-body">
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="requesterSiteId">Site de collecte</label>
+									<select id="requesterSiteId" th:field="*{requesterSiteId}" class="form-select form-select-sm select2" disabled="disabled">
+										<option value=""></option>
+										<option th:each="site : ${sites}" th:value="${site.id}" th:text="${site.name}"></option>
+									</select>
+									<input type="hidden" th:field="*{requesterSiteId}"/>
+									<span class="hint">Site non modifiable depuis cet écran</span>
+								</div>
+								<div class="col-md-6 field">
+									<label for="sampleTypeId">Type d'échantillon <span class="req">*</span></label>
+									<select id="sampleTypeId" th:field="*{sampleTypeId}" class="form-select form-select-sm select2" required>
+										<option value=""></option>
+										<option th:each="t : ${sampleTypes}" th:value="${t.id}" th:text="${t.name}"></option>
+									</select>
+								</div>
+							</div>
+
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="patientIdentifier">Code patient <span class="req">*</span></label>
+									<div class="input-with-action">
+										<input type="text" id="patientIdentifier" th:field="*{patientIdentifier}"
+											class="form-control form-control-sm" maxlength="50"
+											placeholder="ex. P-2025-0123" required/>
+										<button type="button" class="input-action" title="Copier"
+											onclick="copyValue(this, '#patientIdentifier')">
+											<i class="fas fa-copy"></i>
+										</button>
+									</div>
+								</div>
+								<div class="col-md-6 field">
+									<label for="sampleStatusId">Statut <span class="req">*</span></label>
+									<select id="sampleStatusId" th:field="*{sampleStatusId}" class="form-select form-select-sm select2" required>
+										<option value=""></option>
+										<option th:each="s : ${sampleStatus}" th:value="${s.id}" th:text="${s.description}"></option>
+									</select>
+								</div>
+							</div>
+
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="collectionDate">Date de prélèvement <span class="req">*</span></label>
+									<input type="datetime-local" id="collectionDate" th:field="*{collectionDate}"
+										class="form-control form-control-sm" required/>
+								</div>
+								<div class="col-md-6 field">
+									<label for="labNumber">Numéro laboratoire</label>
+									<div class="input-with-action">
+										<input type="text" id="labNumber" th:field="*{labNumber}"
+											class="form-control form-control-sm" placeholder="N° interne du labo"/>
+										<button type="button" class="input-action" title="Copier"
+											onclick="copyValue(this, '#labNumber')">
+											<i class="fas fa-copy"></i>
+										</button>
+									</div>
+								</div>
+							</div>
+						</div>
+					</section>
+
+					<!-- ============ SECTION 2 : TRANSPORT ============ -->
+					<section class="section-card" data-section="transport">
+						<div class="section-header" onclick="toggleSection(this)">
+							<h2><span class="step-num">2</span>Transport &amp; dépôt</h2>
+							<i class="fas fa-chevron-down toggle-icon"></i>
+						</div>
+						<div class="section-body">
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="destinationLabId">Laboratoire de destination</label>
+									<select id="destinationLabId" th:field="*{destinationLabId}" class="form-select form-select-sm select2">
+										<option value=""></option>
+										<option th:each="lab : ${labs}" th:value="${lab.id}" th:text="${lab.name}"></option>
+									</select>
+								</div>
+								<div class="col-md-6 field">
+									<label for="labId">Laboratoire ayant accepté</label>
+									<select id="labId" th:field="*{labId}" class="form-select form-select-sm select2">
+										<option value=""></option>
+										<option th:each="lab : ${labs}" th:value="${lab.id}" th:text="${lab.name}"></option>
+									</select>
+								</div>
+							</div>
+
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="collectionStartMileage">Km début collecte</label>
+									<input type="number" min="0" id="collectionStartMileage" th:field="*{collectionStartMileage}"
+										class="form-control form-control-sm" placeholder="0"/>
+								</div>
+								<div class="col-md-6 field">
+									<label for="collectionEndMileage">Km fin collecte</label>
+									<input type="number" min="0" id="collectionEndMileage" th:field="*{collectionEndMileage}"
+										class="form-control form-control-sm" placeholder="0"/>
+								</div>
+							</div>
+
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="deliverAtHubDate">Date transmission au hub (labo relais)</label>
+									<input type="datetime-local" id="deliverAtHubDate" th:field="*{deliverAtHubDate}" class="form-control form-control-sm"/>
+								</div>
+								<div class="col-md-6 field">
+									<label for="acceptedAtHubDate">Date réception au hub</label>
+									<input type="datetime-local" id="acceptedAtHubDate" th:field="*{acceptedAtHubDate}" class="form-control form-control-sm"/>
+								</div>
+							</div>
+
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="deliverAtLabDate">Date transmission au laboratoire final</label>
+									<input type="datetime-local" id="deliverAtLabDate" th:field="*{deliverAtLabDate}" class="form-control form-control-sm"/>
+								</div>
+								<div class="col-md-6 field">
+									<label for="acceptedAtLabDate">Date réception au laboratoire final</label>
+									<input type="datetime-local" id="acceptedAtLabDate" th:field="*{acceptedAtLabDate}" class="form-control form-control-sm"/>
+								</div>
+							</div>
+						</div>
+					</section>
+
+					<!-- ============ SECTION 3 : ANALYSE ============ -->
+					<section class="section-card" data-section="analyse">
+						<div class="section-header" onclick="toggleSection(this)">
+							<h2><span class="step-num">3</span>Analyse au laboratoire</h2>
+							<i class="fas fa-chevron-down toggle-icon"></i>
+						</div>
+						<div class="section-body">
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="analysisCompletedDate">Date de réalisation du test</label>
+									<input type="datetime-local" id="analysisCompletedDate" th:field="*{analysisCompletedDate}" class="form-control form-control-sm"/>
+								</div>
+								<div class="col-md-6 field">
+									<label for="analysisReleasedDate">Date de validation biologique</label>
+									<input type="datetime-local" id="analysisReleasedDate" th:field="*{analysisReleasedDate}" class="form-control form-control-sm"/>
+								</div>
+							</div>
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="resultReportedDate">Date disponibilité du résultat</label>
+									<input type="datetime-local" id="resultReportedDate" th:field="*{resultReportedDate}" class="form-control form-control-sm"/>
+								</div>
+							</div>
+						</div>
+					</section>
+
+					<!-- ============ SECTION 4 : RÉSULTAT ============ -->
+					<section class="section-card" data-section="result">
+						<div class="section-header" onclick="toggleSection(this)">
+							<h2><span class="step-num">4</span>Récupération &amp; livraison du résultat</h2>
+							<i class="fas fa-chevron-down toggle-icon"></i>
+						</div>
+						<div class="section-body">
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="resultCollectionDate">Date de récupération</label>
+									<input type="datetime-local" id="resultCollectionDate" th:field="*{resultCollectionDate}" class="form-control form-control-sm"/>
+								</div>
+								<div class="col-md-6 field">
+									<label for="resultDeliveryDate">Date de transmission au site</label>
+									<input type="datetime-local" id="resultDeliveryDate" th:field="*{resultDeliveryDate}" class="form-control form-control-sm"/>
+								</div>
+							</div>
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="resultStartMileage">Km début collecte résultat</label>
+									<input type="number" min="0" id="resultStartMileage" th:field="*{resultStartMileage}" class="form-control form-control-sm" placeholder="0"/>
+								</div>
+								<div class="col-md-6 field">
+									<label for="resultEndMileage">Km fin collecte résultat</label>
+									<input type="number" min="0" id="resultEndMileage" th:field="*{resultEndMileage}" class="form-control form-control-sm" placeholder="0"/>
+								</div>
+							</div>
+						</div>
+					</section>
+
+					<!-- ============ SECTION 5 : REJET ============ -->
+					<section class="section-card section-rejection" data-section="rejection">
+						<div class="section-header" onclick="toggleSection(this)">
+							<h2><span class="step-num">!</span>Rejet / Non-conformité</h2>
+							<i class="fas fa-chevron-down toggle-icon"></i>
+						</div>
+						<div class="section-body">
+							<div class="alert alert-warning small mb-3">
+								<i class="fas fa-info-circle"></i>
+								Renseignez cette section uniquement si l'échantillon est marqué comme <strong>NON_CONFORM</strong>.
+							</div>
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="rejectionTypeId">Raison du rejet</label>
+									<select id="rejectionTypeId" th:field="*{rejectionTypeId}" class="form-select form-select-sm select2">
+										<option value=""></option>
+										<option th:each="rt : ${sampleRejectionTypes}" th:value="${rt.id}" th:text="${rt.rejectionType}"></option>
+									</select>
+								</div>
+								<div class="col-md-6 field">
+									<label for="rejectionDate">Date du rejet</label>
+									<input type="datetime-local" id="rejectionDate" th:field="*{rejectionDate}" class="form-control form-control-sm"/>
+								</div>
+							</div>
+							<div class="field">
+								<label for="rejectionComment">Commentaire (optionnel)</label>
+								<textarea id="rejectionComment" th:field="*{rejectionComment}" class="form-control form-control-sm"
+									rows="2" maxlength="500" placeholder="Précisez les circonstances du rejet..."></textarea>
+							</div>
+						</div>
+					</section>
+
+					<!-- ============ MÉTADONNÉES (lecture seule) ============ -->
+					<div class="meta-readonly mb-3">
+						<div><span class="lbl">Créé le :</span> <span th:text="${sample?.createdAt != null ? #dates.format(sample.createdAt, 'dd/MM/yyyy HH:mm') : '—'}">—</span></div>
+						<div><span class="lbl">Dernière mise à jour :</span> <span th:text="${sample?.lastupdatedAt != null ? #dates.format(sample.lastupdatedAt, 'dd/MM/yyyy HH:mm') : '—'}">—</span></div>
+					</div>
+
+				</form>
+
+				<div class="save-bar">
+		<a th:href="@{/sample}" class="btn btn-outline-secondary">Annuler</a>
+		<button type="submit" form="editForm" class="btn btn-primary">
+			<i class="fas fa-save"></i> Enregistrer les modifications
+		</button>
+	</div>
+
+			</div>
+		</div>
+	</div>
+
+	<!-- ===== Sticky save bar ===== -->
+	<footer class="py-4 bg-light mt-auto" th:insert="~{fragments/footer :: footer}"></footer>
+
+	<script th:src="@{/webjars/jquery/3.6.0/jquery.min.js}"></script>
+	<script th:src="@{/webjars/bootstrap/5.1.3/js/bootstrap.bundle.min.js}"></script>
+	<script th:src="@{/webjars/font-awesome/5.15.4/js/all.js}"></script>
+	<script th:src="@{/webjars/select2/4.0.13/js/select2.min.js}"></script>
+
+	<script th:inline="none">
+	/* eslint-disable */
+	$(function () {
+		$('.select2').select2({ width: '100%', allowClear: true, placeholder: '— Sélectionner —' });
+
+		// Restore collapsed sections from sessionStorage
+		try {
+			const collapsed = JSON.parse(sessionStorage.getItem('editCollapsed') || '[]');
+			collapsed.forEach(function(s) {
+				$('.section-card[data-section="' + s + '"]').addClass('collapsed');
+			});
+		} catch (e) {}
+	});
+
+	function toggleSection(headerEl) {
+		const card = headerEl.closest('.section-card');
+		card.classList.toggle('collapsed');
+		const collapsed = [];
+		document.querySelectorAll('.section-card.collapsed').forEach(function(c) {
+			collapsed.push(c.dataset.section);
+		});
+		sessionStorage.setItem('editCollapsed', JSON.stringify(collapsed));
+	}
+
+	function copyValue(btn, selector) {
+		const txt = selector ? document.querySelector(selector).value : btn.getAttribute('data-copy');
+		if (!txt) return;
+		const done = function() {
+			const orig = btn.innerHTML;
+			btn.innerHTML = '<i class="fas fa-check text-success"></i>';
+			setTimeout(function() { btn.innerHTML = orig; }, 900);
+		};
+		if (navigator.clipboard && window.isSecureContext) {
+			navigator.clipboard.writeText(txt).then(done).catch(function() {
+				fallbackCopy(txt); done();
+			});
+		} else { fallbackCopy(txt); done(); }
+	}
+	function fallbackCopy(text) {
+		const ta = document.createElement('textarea');
+		ta.value = text; document.body.appendChild(ta); ta.select();
+		try { document.execCommand('copy'); } catch (e) {}
+		document.body.removeChild(ta);
+	}
+
+	function confirmDelete(event, element) {
+		event.preventDefault();
+		const id = element.getAttribute('data-id');
+		if (!confirm('Confirmer la suppression définitive de cet échantillon ?')) return;
+		$.ajax({
+			url: '/sample/delete/' + id,
+			type: 'POST',
+			success: function() { window.location.href = '/sample'; },
+			error: function() { alert('Erreur lors de la suppression'); }
+		});
+	}
+
+	// Native HTML5 validation feedback
+	const form = document.getElementById('editForm');
+	form.addEventListener('submit', function(e) {
+		if (!form.checkValidity()) {
+			e.preventDefault();
+			form.classList.add('was-validated');
+			// open the first invalid section
+			const firstInvalid = form.querySelector(':invalid');
+			if (firstInvalid) {
+				const sec = firstInvalid.closest('.section-card');
+				if (sec) sec.classList.remove('collapsed');
+				firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}
+		}
+	});
+	</script>
+
+</body>
+</html>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd
+    http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+	<include file="./create-refresh-tokens.xml"
+		relativeToChangelogFile="true" />
+	<include file="./update_sample_table.xml"
+		relativeToChangelogFile="true" />
+	<include file="./add_version_and_perf_indexes.xml"
+		relativeToChangelogFile="true" />
+	<include file="./add_report_perf_indexes.xml"
+		relativeToChangelogFile="true" />
+	<include file="./fix_sequences_after_loaddata.xml"
+		relativeToChangelogFile="true" />
+
+
+
+
+
+</databaseChangeLog>

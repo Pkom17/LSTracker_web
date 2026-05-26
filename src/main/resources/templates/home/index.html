@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:th="http://www.thymeleaf.org"
+	xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity6">
+
+<head th:replace="~{fragments/header :: head}">
+<title>Tableau de bord</title>
+</head>
+
+<body class="sb-nav-fixed">
+
+<style>
+.dashboard-wrap { padding-bottom: 2rem; }
+
+/* ===== Filter panel (style aligné sur la page /sample) ===== */
+.sample-sidebar {
+	border: 1px solid #e6e9f3;
+	border-radius: .75rem;
+	background: #fff;
+	margin-bottom: .75rem;
+	box-shadow: 0 1px 3px rgba(0,0,0,.03);
+}
+.sample-sidebar .sidebar-header {
+	background: #f8fafc;
+	border-bottom: 1px solid #e6e9f3;
+	padding: .5rem .9rem;
+	border-radius: .75rem .75rem 0 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	cursor: pointer;
+	user-select: none;
+}
+.sample-sidebar.collapsed .sidebar-header { border-bottom: 0; border-radius: .75rem; }
+.sample-sidebar .sidebar-header .chevron { transition: transform .2s ease; }
+.sample-sidebar.collapsed .sidebar-header .chevron { transform: rotate(-90deg); }
+
+.sample-sidebar .sidebar-body {
+	padding: .6rem .75rem;
+	display: grid;
+	grid-template-columns: repeat(12, minmax(0, 1fr));
+	gap: .4rem .6rem;
+	align-items: start;
+}
+.sample-sidebar.collapsed .sidebar-body { display: none; }
+
+.sample-sidebar .form-control,
+.sample-sidebar .form-select,
+.sample-sidebar .input-group-text {
+	font-size: .78rem;
+}
+.sample-sidebar .input-group-sm { min-height: calc(1.5em + .5rem + 2px); }
+.sample-sidebar .input-group-text {
+	align-items: center;
+	background: #f8fafc;
+	color: #4b5563;
+	font-weight: 600;
+	min-width: 6.75rem;
+	padding-left: .5rem;
+	padding-right: .5rem;
+	white-space: nowrap;
+}
+.sample-sidebar .input-group > .select2-container {
+	flex: 1 1 auto;
+	min-width: 0;
+	width: 1% !important;
+}
+.sample-sidebar .select2-container--default .select2-selection--single {
+	height: calc(1.5em + .5rem + 2px);
+	border-color: #ced4da;
+	border-top-left-radius: 0;
+	border-bottom-left-radius: 0;
+	display: flex !important;
+	align-items: center !important;
+}
+.sample-sidebar .select2-container--default .select2-selection--single .select2-selection__rendered {
+	line-height: calc(1.5em + .5rem);
+	padding-left: .5rem;
+	font-size: .78rem;
+}
+.sample-sidebar .select2-container--default .select2-selection--single .select2-selection__arrow {
+	height: 100% !important; top: 50% !important;
+	transform: translateY(-50%) !important; right: .5rem !important;
+}
+
+.sample-sidebar .filter-group { margin-bottom: 0; }
+/* Ligne 1 : Période + presets + Laboratoire */
+.sample-sidebar .filter-period  { grid-column: 1 / span 5; }
+.sample-sidebar .filter-presets { grid-column: 6 / span 4; }
+.sample-sidebar .filter-lab     { grid-column: 10 / span 3; }
+/* Ligne 2 : Région + District + Site */
+.sample-sidebar .filter-region  { grid-column: 1 / span 4; }
+.sample-sidebar .filter-district{ grid-column: 5 / span 4; }
+.sample-sidebar .filter-site    { grid-column: 9 / span 4; }
+.sample-sidebar .filter-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: .5rem; }
+@media (max-width: 991.98px) {
+	.sample-sidebar .filter-group { grid-column: 1 / -1; }
+}
+
+/* Date presets chips */
+.date-presets { display: flex; flex-wrap: wrap; gap: .2rem; }
+.date-presets .btn {
+	font-size: .68rem;
+	height: calc(1.5em + .5rem + 2px);
+	padding: .1rem .42rem;
+}
+
+/* Période : dates compactes côte à côte */
+.period-range .input-group-text {
+	min-width: auto;
+	padding: .15rem .35rem;
+	font-size: .7rem;
+}
+.period-range .input-group:first-child .input-group-text:first-child {
+	min-width: 8.75rem;
+}
+.period-range .date-input {
+	flex: 0 0 7.5rem;
+	min-width: 0;
+}
+
+/* ===== Bandeau d'aide explicatif (au-dessus de chaque zone) ===== */
+.section-note {
+	display: flex;
+	align-items: flex-start;
+	gap: .5rem;
+	padding: .55rem .75rem;
+	margin-bottom: .65rem;
+	background: #f8fafc;
+	border: 1px solid #e6e9f3;
+	border-left: 3px solid #3b82f6;
+	border-radius: .5rem;
+	font-size: .78rem;
+	color: #4b5563;
+	line-height: 1.4;
+}
+.section-note i { color: #3b82f6; margin-top: .15rem; flex-shrink: 0; }
+.section-note strong { color: #1f2937; }
+
+/* Petit "?" d'aide contextuelle dans une card / étape funnel. Le texte
+   d'aide est passé via l'attribut data-tip et affiché en tooltip CSS
+   instantané au survol (sans dépendance JS, sans délai navigateur du
+   tooltip natif title=""). */
+.help-tip {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 14px; height: 14px;
+	border-radius: 50%;
+	background: #d1d5db;
+	color: #1f2937;
+	font-size: .6rem;
+	font-weight: 700;
+	cursor: help;
+	margin-left: .25rem;
+}
+.help-tip:hover { background: #9ca3af; color: #111827; }
+
+.help-tip::after {
+	content: attr(data-tip);
+	position: absolute;
+	bottom: calc(100% + 6px);
+	left: 50%;
+	transform: translateX(-50%);
+	min-width: 200px;
+	max-width: 280px;
+	padding: .45rem .6rem;
+	background: #1f2937;
+	color: #fff;
+	font-size: .72rem;
+	font-weight: 500;
+	line-height: 1.35;
+	border-radius: .35rem;
+	text-align: left;
+	white-space: normal;
+	pointer-events: none;
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity .15s ease, visibility .15s ease;
+	z-index: 1000;
+	box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+.help-tip::before {
+	content: "";
+	position: absolute;
+	bottom: 100%;
+	left: 50%;
+	transform: translateX(-50%);
+	border: 5px solid transparent;
+	border-top-color: #1f2937;
+	pointer-events: none;
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity .15s ease, visibility .15s ease;
+	z-index: 1000;
+}
+.help-tip:hover::after,
+.help-tip:hover::before { opacity: 1; visibility: visible; }
+
+/* ===== KPI cards (style "icône en bulle") ===== */
+.kpi-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+	gap: .75rem;
+	margin-bottom: 1rem;
+}
+/* Seconde rangée : 3 colonnes fixes au-dessus de 720px, fluide en dessous. */
+.kpi-grid-secondary {
+	grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 720px) {
+	.kpi-grid-secondary { grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); }
+}
+.kpi-card {
+	background: #fff;
+	border: 1px solid #e6e9f3;
+	border-radius: .75rem;
+	padding: .85rem 1rem;
+	transition: box-shadow .2s ease, transform .15s ease, border-color .2s ease;
+	cursor: pointer;
+	display: grid;
+	grid-template-columns: 42px 1fr;
+	grid-template-areas:
+		"icon  label"
+		"icon  value"
+		"icon  trend";
+	column-gap: .85rem;
+	row-gap: .1rem;
+	align-items: center;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+.kpi-card:hover {
+	box-shadow: 0 6px 18px rgba(15, 23, 42, .10);
+	transform: translateY(-2px);
+	border-color: #cbd5e1;
+}
+.kpi-card .kpi-icon {
+	grid-area: icon;
+	width: 42px;
+	height: 42px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 1.1rem;
+	flex-shrink: 0;
+	/* Couleurs par défaut, overridées par les variants accent-* */
+	background: #eef2ff;
+	color: #4f46e5;
+}
+.kpi-card .label {
+	grid-area: label;
+	font-size: .68rem;
+	text-transform: uppercase;
+	color: #6b7280;
+	font-weight: 600;
+	letter-spacing: .04em;
+	display: flex;
+	align-items: center;
+	gap: .25rem;
+	line-height: 1.2;
+	margin-bottom: .1rem;
+}
+.kpi-card .value {
+	grid-area: value;
+	font-size: 1.7rem;
+	font-weight: 700;
+	color: #0f172a;
+	line-height: 1.05;
+	letter-spacing: -0.02em;
+}
+.kpi-card .value small { font-size: .85rem; font-weight: 500; color: #6b7280; }
+.kpi-card .trend {
+	grid-area: trend;
+	font-size: .68rem;
+	display: flex;
+	align-items: center;
+	gap: .2rem;
+	margin-top: .1rem;
+	min-height: .9rem;
+}
+.kpi-trend-up   { color: #16a34a; }
+.kpi-trend-down { color: #dc2626; }
+.kpi-trend-flat { color: #9ca3af; }
+
+/* Couleurs des bulles icônes par variant (pastel pour le fond, foncé pour
+   l'icône — niveaux 700/800 de la palette Tailwind pour passer WCAG AA). */
+.kpi-card.accent-blue   .kpi-icon { background: #dbeafe; color: #1e40af; }
+.kpi-card.accent-cyan   .kpi-icon { background: #cffafe; color: #155e75; }
+.kpi-card.accent-orange .kpi-icon { background: #ffedd5; color: #9a3412; }
+.kpi-card.accent-purple .kpi-icon { background: #ede9fe; color: #6d28d9; }
+.kpi-card.accent-indigo .kpi-icon { background: #e0e7ff; color: #3730a3; }
+.kpi-card.accent-pink   .kpi-icon { background: #fce7f3; color: #9d174d; }
+.kpi-card.accent-green  .kpi-icon { background: #dcfce7; color: #15803d; }
+.kpi-card.accent-red    .kpi-icon { background: #fee2e2; color: #991b1b; }
+.kpi-card.accent-gray   .kpi-icon { background: #f1f5f9; color: #334155; }
+
+/* ===== Coverage section ===== */
+.coverage-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: .5rem;
+}
+.coverage-card {
+	background: #f8fafc;
+	border: 1px solid #e6e9f3;
+	border-radius: .5rem;
+	padding: .65rem .85rem;
+}
+.coverage-card .lbl {
+	font-size: .68rem;
+	text-transform: uppercase;
+	color: #6b7280;
+	font-weight: 600;
+	letter-spacing: .03em;
+	display: flex; align-items: center; gap: .35rem;
+}
+.coverage-card .val {
+	font-size: 1.25rem;
+	font-weight: 700;
+	color: #1f2937;
+	line-height: 1.15;
+	margin-top: .1rem;
+}
+.coverage-card .val .sub {
+	font-size: .8rem;
+	font-weight: 500;
+	color: #6b7280;
+}
+.coverage-card .progress {
+	height: 5px;
+	border-radius: 3px;
+	margin-top: .35rem;
+	background: #e5e7eb;
+}
+.coverage-card .progress-bar { border-radius: 3px; }
+
+/* ===== Sections ===== */
+.section {
+	background: #fff;
+	border: 1px solid #e6e9f3;
+	border-radius: .75rem;
+	margin-bottom: 1rem;
+	box-shadow: 0 1px 3px rgba(0,0,0,.03);
+}
+.section-header {
+	padding: .75rem 1.25rem;
+	border-bottom: 1px solid #e6e9f3;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	background: #f8fafc;
+	border-radius: .75rem .75rem 0 0;
+	flex-wrap: wrap;
+	gap: .5rem;
+}
+.section-header h3 {
+	font-size: .9rem;
+	margin: 0;
+	font-weight: 600;
+	color: #1f2937;
+}
+.section-header h3 i { color: #4f46e5; margin-right: .35rem; }
+.section-body { padding: 1rem 1.25rem; }
+
+/* ===== Charts ===== */
+.chart-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 1rem;
+}
+@media (max-width: 992px) { .chart-grid { grid-template-columns: 1fr; } }
+.chart-card {
+	background: #fff;
+	border: 1px solid #e6e9f3;
+	border-radius: .75rem;
+	box-shadow: 0 1px 3px rgba(0,0,0,.03);
+}
+.chart-card .chart-header {
+	padding: .65rem 1rem;
+	border-bottom: 1px solid #e6e9f3;
+	background: #f8fafc;
+	border-radius: .75rem .75rem 0 0;
+	display: flex; align-items: center; justify-content: space-between;
+	font-size: .85rem; font-weight: 600; color: #1f2937;
+}
+.chart-card .chart-header i { color: #4f46e5; margin-right: .25rem; }
+.chart-card .chart-body { padding: .5rem; }
+.chart-card .chart-canvas { height: 320px; }
+
+/* ===== Drill-down table ===== */
+.drill-table { width: 100%; font-size: .85rem; }
+.drill-table thead th {
+	background: #f8fafc;
+	font-size: .72rem;
+	text-transform: uppercase;
+	color: #6b7280;
+	font-weight: 600;
+	letter-spacing: .03em;
+	padding: .5rem .75rem;
+	border-bottom: 2px solid #e6e9f3;
+	text-align: left;
+}
+.drill-table tbody td { padding: .5rem .75rem; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+.drill-table tr.drill-region { background: #fafbff; font-weight: 600; }
+.drill-table tr.drill-district { background: #fcfdff; }
+.drill-table tr.drill-site { font-size: .82rem; }
+.drill-table tr.drill-region td:first-child,
+.drill-table tr.drill-district td:first-child,
+.drill-table tr.drill-site td:first-child { display: flex; align-items: center; gap: .35rem; }
+.drill-table .indent-1 { padding-left: 1.5rem; }
+.drill-table .indent-2 { padding-left: 3rem; }
+.drill-table .expander {
+	width: 1.25rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: #6b7280;
+	cursor: pointer;
+	user-select: none;
+	border-radius: .15rem;
+}
+.drill-table .expander:hover { color: #1f2937; background: #f3f4f6; }
+.drill-table .expander.placeholder { cursor: default; }
+.drill-table .expander.placeholder:hover { background: none; color: #6b7280; }
+.drill-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.tat-pill {
+	display: inline-block;
+	min-width: 2.5rem;
+	text-align: center;
+	font-weight: 600;
+	font-size: .72rem;
+	padding: .15rem .45rem;
+	border-radius: .25rem;
+	color: #fff;
+}
+.tat-green { background: #16a34a; }
+.tat-orange { background: #f59e0b; }
+.tat-red { background: #dc2626; }
+.tat-na { background: #d1d5db; color: #374151; }
+
+/* ===== Top performers ===== */
+.top-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+	gap: 1rem;
+}
+.top-card {
+	background: #fff;
+	border: 1px solid #e6e9f3;
+	border-radius: .5rem;
+}
+.top-card .top-card-header {
+	padding: .5rem .85rem;
+	border-bottom: 1px solid #e6e9f3;
+	background: #f8fafc;
+	font-size: .8rem;
+	font-weight: 600;
+	color: #374151;
+	display: flex; align-items: center; gap: .35rem;
+	border-radius: .5rem .5rem 0 0;
+}
+.top-card ol {
+	list-style: none;
+	padding: .25rem 0;
+	margin: 0;
+	font-size: .82rem;
+}
+.top-card ol li {
+	padding: .35rem .85rem;
+	display: flex;
+	justify-content: space-between;
+	gap: .5rem;
+}
+.top-card ol li:nth-child(odd) { background: #fafbff; }
+.top-card .name { color: #1f2937; }
+.top-card .sub { color: #6b7280; font-size: .72rem; }
+.top-card .metric { font-weight: 600; color: #1f2937; white-space: nowrap; }
+
+.text-muted-sm { font-size: .75rem; color: #9ca3af; }
+.empty-state {
+	text-align: center;
+	color: #9ca3af;
+	padding: 2rem 1rem;
+	font-size: .85rem;
+}
+</style>
+
+	<div class="d-flex" id="wrapper">
+		<div id="page-content-wrapper">
+
+			<div th:insert="~{fragments/header :: header(content='Tableau de bord', module='home')}"></div>
+
+			<div class="container-fluid py-3 dashboard-wrap">
+
+				<!-- ============ PANNEAU FILTRES (style aligné sur /sample) ============ -->
+				<aside class="sample-sidebar" id="dashboardFiltersPanel">
+					<div class="sidebar-header" id="dashboardFiltersHeader">
+						<div class="d-flex align-items-center gap-2">
+							<i class="fas fa-chevron-down chevron text-muted"></i>
+							<i class="fas fa-filter text-primary"></i>
+							<strong>Filtres</strong>
+						</div>
+					</div>
+
+					<div class="sidebar-body">
+						<!-- Période -->
+						<div class="filter-group filter-period">
+							<div class="period-range">
+								<div class="input-group input-group-sm">
+									<span class="input-group-text">Période</span>
+									<span class="input-group-text">du</span>
+									<input th:value="${selectedStartDate}" type="text"
+										id="input_start_date" class="form-control date-input"
+										placeholder="jj/mm/aaaa" autocomplete="off"/>
+									<span class="input-group-text">au</span>
+									<input th:value="${selectedEndDate}" type="text"
+										id="input_end_date" class="form-control date-input"
+										placeholder="jj/mm/aaaa" autocomplete="off"/>
+								</div>
+							</div>
+						</div>
+
+						<!-- Presets -->
+						<div class="filter-group filter-presets">
+							<div class="date-presets">
+								<button type="button" class="btn btn-outline-secondary" data-preset="today">Auj.</button>
+								<button type="button" class="btn btn-outline-secondary" data-preset="7d">7 j</button>
+								<button type="button" class="btn btn-outline-secondary" data-preset="30d">30 j</button>
+								<button type="button" class="btn btn-outline-secondary" data-preset="month">Ce mois</button>
+								<button type="button" class="btn btn-outline-secondary" data-preset="ytd">Cette année</button>
+							</div>
+						</div>
+
+						<!-- Laboratoire (sur la même ligne que la période) -->
+						<div class="filter-group filter-lab">
+							<div class="input-group input-group-sm">
+								<label class="input-group-text" for="select_lab">Laboratoire</label>
+								<select class="form-select form-select-sm select2" id="select_lab">
+									<option value=""></option>
+									<option th:each="l : ${labs}" th:value="${l.id}" th:text="${l.name}"
+										th:selected="${l.id == selectedLab}"></option>
+								</select>
+							</div>
+						</div>
+
+						<!-- Région -->
+						<div class="filter-group filter-region">
+							<div class="input-group input-group-sm">
+								<label class="input-group-text" for="select_region">Région</label>
+								<select class="form-select form-select-sm select2" id="select_region">
+									<option value=""></option>
+									<option th:each="r : ${regions}" th:value="${r.id}" th:text="${r.name}"
+										th:selected="${r.id == selectedRegion}"></option>
+								</select>
+							</div>
+						</div>
+
+						<!-- District -->
+						<div class="filter-group filter-district">
+							<div class="input-group input-group-sm">
+								<label class="input-group-text" for="select_district">District</label>
+								<select class="form-select form-select-sm select2" id="select_district">
+									<option value=""></option>
+									<option th:each="d : ${districts}" th:value="${d.id}" th:text="${d.name}"
+										th:selected="${d.id == selectedDistrict}"></option>
+								</select>
+							</div>
+						</div>
+
+						<!-- Site -->
+						<div class="filter-group filter-site">
+							<div class="input-group input-group-sm">
+								<label class="input-group-text" for="select_site">Site</label>
+								<select class="form-select form-select-sm select2" id="select_site">
+									<option value=""></option>
+									<option th:each="s : ${sites}" th:value="${s.id}" th:text="${s.name}"
+										th:selected="${s.id == selectedSite}"></option>
+								</select>
+							</div>
+						</div>
+
+						<!-- Actions : Reset + Apply -->
+						<div class="filter-group filter-actions">
+							<button class="btn btn-sm btn-outline-secondary" id="btnResetFilters" type="button">
+								<i class="fas fa-undo"></i> Réinitialiser
+							</button>
+							<button class="btn btn-sm btn-primary" id="btnApplyFilters" type="button">
+								<i class="fas fa-filter"></i> Appliquer
+							</button>
+						</div>
+					</div>
+				</aside>
+
+				<!-- ============ KPI CARDS ============ -->
+				<div class="section-note">
+					<i class="fas fa-info-circle"></i>
+					<div>
+						<strong>Activité par étape sur la période.</strong>
+						Chaque carte compte les échantillons dont l'étape correspondante a eu lieu dans la période — ce ne sont donc pas les mêmes cohortes. Survolez <span class="help-tip" data-tip="Exemple de tooltip : passe le curseur sur les ? pour voir la définition exacte de chaque chiffre.">?</span> pour la définition exacte.
+					</div>
+				</div>
+				<div class="kpi-grid">
+					<div class="kpi-card accent-blue">
+						<div class="kpi-icon"><i class="fas fa-vials"></i></div>
+						<span class="label">Total collectés<span class="help-tip" data-tip="Échantillons collectés (collection_date) dans la période.">?</span></span>
+						<span class="value" data-kpi="total">0</span>
+						<span class="trend" data-trend="total"></span>
+					</div>
+					<div class="kpi-card accent-cyan">
+						<div class="kpi-icon"><i class="fas fa-motorcycle"></i></div>
+						<span class="label">En transit<span class="help-tip" data-tip="Échantillons actuellement en transit (snapshot global, non lié à la période).">?</span></span>
+						<span class="value" data-kpi="in_transit">0</span>
+						<span class="trend" data-trend="in_transit"></span>
+					</div>
+					<div class="kpi-card accent-orange">
+						<div class="kpi-icon"><i class="fas fa-warehouse"></i></div>
+						<span class="label">Au hub<span class="help-tip" data-tip="Déposés à un hub-relais (deliver_at_hub_date) dans la période.">?</span></span>
+						<span class="value" data-kpi="at_hub">0</span>
+						<span class="trend" data-trend="at_hub"></span>
+					</div>
+					<div class="kpi-card accent-purple">
+						<div class="kpi-icon"><i class="fas fa-flask"></i></div>
+						<span class="label">Au labo<span class="help-tip" data-tip="Déposés au laboratoire final (deliver_at_lab_date) dans la période. N'inclut pas ceux encore au hub.">?</span></span>
+						<span class="value" data-kpi="at_lab">0</span>
+						<span class="trend" data-trend="at_lab"></span>
+					</div>
+					<div class="kpi-card accent-indigo">
+						<div class="kpi-icon"><i class="fas fa-microscope"></i></div>
+						<span class="label">Analysés<span class="help-tip" data-tip="Résultats rendus disponibles (analysis_released_date) dans la période.">?</span></span>
+						<span class="value" data-kpi="analysed">0</span>
+						<span class="trend" data-trend="analysed"></span>
+					</div>
+					<div class="kpi-card accent-pink">
+						<div class="kpi-icon"><i class="fas fa-clipboard-check"></i></div>
+						<span class="label">Résultats collectés<span class="help-tip" data-tip="Résultats récupérés au labo par un convoyeur (result_collection_date) dans la période.">?</span></span>
+						<span class="value" data-kpi="result_collected">0</span>
+						<span class="trend" data-trend="result_collected"></span>
+					</div>
+					<div class="kpi-card accent-green">
+						<div class="kpi-icon"><i class="fas fa-check-circle"></i></div>
+						<span class="label">Résultats livrés<span class="help-tip" data-tip="Résultats livrés sur le site de collecte (result_delivery_date) dans la période.">?</span></span>
+						<span class="value" data-kpi="delivered">0</span>
+						<span class="trend" data-trend="delivered"></span>
+					</div>
+				</div>
+				<!-- Seconde rangée : indicateurs d'incidents + performance (3 cards). -->
+				<div class="kpi-grid kpi-grid-secondary">
+					<div class="kpi-card accent-red">
+						<div class="kpi-icon"><i class="fas fa-ban"></i></div>
+						<span class="label">Non-conformités<span class="help-tip" data-tip="Échantillons rejetés au labo pour non-conformité (rejection_date) dans la période. Statut NON_CONFORM.">?</span></span>
+						<span class="value" data-kpi="non_conform">0</span>
+						<span class="trend" data-trend="non_conform"></span>
+					</div>
+					<div class="kpi-card accent-orange">
+						<div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div>
+						<span class="label">Échecs d'analyse<span class="help-tip" data-tip="Analyses techniquement échouées (analysis_completed_date) dans la période. Statut ANALYSIS_FAILED.">?</span></span>
+						<span class="value" data-kpi="failed">0</span>
+						<span class="trend" data-trend="failed"></span>
+					</div>
+					<div class="kpi-card accent-gray">
+						<div class="kpi-icon"><i class="fas fa-stopwatch"></i></div>
+						<span class="label">TAT moyen<span class="help-tip" data-tip="Médiane (result_delivery_date − collection_date) en jours, sur les échantillons collectés dans la période ET dont le résultat a été livré.">?</span></span>
+						<span class="value"><span data-kpi="tat_avg_days">0</span><small> j</small></span>
+						<span class="trend" data-trend="tat_avg_days"></span>
+					</div>
+				</div>
+
+
+				<!-- ============ COUVERTURE ============ -->
+				<div class="section">
+					<div class="section-header">
+						<h3><i class="fas fa-globe-africa"></i> Couverture du programme</h3>
+						<span class="text-muted-sm">Sur la période sélectionnée</span>
+					</div>
+					<div class="section-body">
+						<div class="coverage-grid">
+							<div class="coverage-card">
+								<div class="lbl"><i class="fas fa-clinic-medical text-primary"></i> Sites actifs</div>
+								<div class="val"><span data-cov="active_sites">0</span><span class="sub"> / <span data-cov="total_sites">0</span></span></div>
+								<div class="progress"><div class="progress-bar bg-primary" data-cov-bar="sites" style="width:0%"></div></div>
+							</div>
+							<div class="coverage-card">
+								<div class="lbl"><i class="fas fa-map text-info"></i> Districts couverts</div>
+								<div class="val"><span data-cov="active_districts">0</span><span class="sub"> / <span data-cov="total_districts">0</span></span></div>
+								<div class="progress"><div class="progress-bar bg-info" data-cov-bar="districts" style="width:0%"></div></div>
+							</div>
+							<div class="coverage-card">
+								<div class="lbl"><i class="fas fa-globe text-success"></i> Régions couvertes</div>
+								<div class="val"><span data-cov="active_regions">0</span><span class="sub"> / <span data-cov="total_regions">0</span></span></div>
+								<div class="progress"><div class="progress-bar bg-success" data-cov-bar="regions" style="width:0%"></div></div>
+							</div>
+							<div class="coverage-card">
+								<div class="lbl"><i class="fas fa-motorcycle text-warning"></i> Convoyeurs actifs</div>
+								<div class="val"><span data-cov="active_conveyors">0</span></div>
+							</div>
+							<div class="coverage-card">
+								<div class="lbl"><i class="fas fa-flask text-purple"></i> Labos récepteurs</div>
+								<div class="val"><span data-cov="active_labs">0</span><span class="sub"> / <span data-cov="total_labs">0</span></span></div>
+								<div class="progress"><div class="progress-bar bg-purple" data-cov-bar="labs" style="width:0%; background-color:#8b5cf6;"></div></div>
+							</div>
+							<div class="coverage-card">
+								<div class="lbl"><i class="fas fa-route text-secondary"></i> Distance totale</div>
+								<div class="val"><span data-cov="total_distance_km">0</span><span class="sub"> km</span></div>
+							</div>
+							<div class="coverage-card">
+								<div class="lbl"><i class="fas fa-tachometer-alt text-secondary"></i> Km moyen / éch.</div>
+								<div class="val"><span data-cov="avg_distance_per_sample_km">0</span><span class="sub"> km</span></div>
+							</div>
+							<div class="coverage-card" style="grid-column: span 2;">
+								<div class="lbl"><i class="fas fa-vial text-indigo"></i> Répartition par type d'échantillon</div>
+								<div id="type-breakdown-chart" style="height: 110px; margin-top: .3rem;"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- ============ GRAPHIQUES ============ -->
+				<div class="chart-grid">
+					<div class="chart-card">
+						<div class="chart-header">
+							<span><i class="fas fa-chart-column"></i> Échantillons par type — statuts</span>
+						</div>
+						<div class="chart-body">
+							<div id="chart_status_by_type" class="chart-canvas"></div>
+						</div>
+					</div>
+					<div class="chart-card">
+						<div class="chart-header">
+							<span><i class="fas fa-chart-line"></i> Évolution dans le temps</span>
+							<select id="granularitySelect" class="form-select form-select-sm" style="width: auto;">
+								<option value="day" selected>Jour</option>
+								<option value="week">Semaine</option>
+								<option value="month">Mois</option>
+							</select>
+						</div>
+						<div class="chart-body">
+							<div id="chart_series" class="chart-canvas"></div>
+						</div>
+					</div>
+				</div>
+
+				<div class="section">
+					<div class="section-header">
+						<h3><i class="fas fa-hourglass-half"></i> Durée médiane par étape (jours)</h3>
+					</div>
+					<div class="section-body">
+						<div id="chart_durations" style="height: 360px;"></div>
+					</div>
+				</div>
+
+				<!-- ============ DRILL-DOWN ============ -->
+				<div class="section">
+					<div class="section-header">
+						<h3><i class="fas fa-sitemap"></i> Répartition par zone géographique</h3>
+						<div class="d-flex align-items-center gap-3">
+							<div class="form-check form-switch m-0">
+								<input class="form-check-input" type="checkbox" id="showEmptyZones"/>
+								<label class="form-check-label text-muted-sm" for="showEmptyZones">Afficher zones sans données</label>
+							</div>
+							<span class="text-muted-sm">Cliquez sur ▶ pour développer</span>
+						</div>
+					</div>
+					<div class="section-body" style="padding: 0;">
+						<table class="drill-table" id="drillTable">
+							<thead>
+								<tr>
+									<th>Zone</th>
+									<th class="num">Total</th>
+									<th class="num">En transit</th>
+									<th class="num">Livrés</th>
+									<th class="num">Rejets</th>
+									<th class="num">TAT moyen</th>
+								</tr>
+							</thead>
+							<tbody id="drillTableBody">
+								<tr><td colspan="6" class="empty-state">Chargement...</td></tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+
+				<!-- ============ TOP PERFORMERS ============ -->
+				<div class="section">
+					<div class="section-header">
+						<h3><i class="fas fa-medal"></i> Indicateurs de performance</h3>
+					</div>
+					<div class="section-body">
+						<div class="top-grid">
+							<div class="top-card">
+								<div class="top-card-header"><i class="fas fa-ban text-danger"></i> Sites avec taux de rejet élevé</div>
+								<ol id="topRejectionSites"><li class="text-muted-sm">Chargement...</li></ol>
+							</div>
+							<div class="top-card">
+								<div class="top-card-header"><i class="fas fa-clock text-warning"></i> Laboratoires les plus lents</div>
+								<ol id="slowestLabs"><li class="text-muted-sm">Chargement...</li></ol>
+							</div>
+							<div class="top-card">
+								<div class="top-card-header"><i class="fas fa-trophy text-success"></i> Convoyeurs les plus actifs</div>
+								<ol id="topConveyors"><li class="text-muted-sm">Chargement...</li></ol>
+							</div>
+						</div>
+					</div>
+				</div>
+
+			</div>
+		</div>
+	</div>
+
+	<footer class="py-4 bg-light mt-auto" th:insert="~{fragments/footer :: footer}"></footer>
+
+	<script th:src="@{/webjars/jquery/3.6.0/jquery.min.js}"></script>
+	<script th:src="@{/webjars/jquery-ui/1.13.2/jquery-ui.min.js}"></script>
+	<script th:src="@{/webjars/bootstrap/5.1.3/js/bootstrap.bundle.min.js}"></script>
+	<script th:src="@{/webjars/font-awesome/5.15.4/js/all.js}"></script>
+	<script th:src="@{/webjars/select2/4.0.13/js/select2.min.js}"></script>
+	<script th:src="@{/webjars/highcharts/9.3.2/highcharts.js}"></script>
+	<script th:src="@{/webjars/highcharts/9.3.2/modules/exporting.js}"></script>
+	<script th:src="@{/webjars/highcharts/9.3.2/modules/offline-exporting.js}"></script>
+
+	<script th:inline="none">
+	/* eslint-disable */
+	$(function () {
+		// Highcharts global config: French export menu + offline rendering
+		if (window.Highcharts) {
+			Highcharts.setOptions({
+				lang: {
+					contextButtonTitle: 'Options du graphique',
+					downloadJPEG: 'Télécharger en JPEG',
+					downloadPDF: 'Télécharger en PDF',
+					downloadPNG: 'Télécharger en PNG',
+					downloadSVG: 'Télécharger en SVG',
+					printChart: 'Imprimer',
+					viewFullscreen: 'Plein écran',
+					exitFullscreen: 'Quitter le plein écran',
+					loading: 'Chargement...',
+					noData: 'Aucune donnée à afficher',
+					resetZoom: 'Réinitialiser le zoom',
+					resetZoomTitle: 'Réinitialiser le niveau de zoom'
+				},
+				exporting: {
+					enabled: true,
+					fallbackToExportServer: false,
+					sourceWidth: 1100,
+					sourceHeight: 500,
+					chartOptions: {
+						title: { style: { fontSize: '14px' } },
+						subtitle: { text: 'LSTracker — ' + new Date().toLocaleDateString('fr-FR'), style: { fontSize: '10px', color: '#9ca3af' } }
+					},
+					buttons: {
+						contextButton: {
+							menuItems: ['viewFullscreen', 'separator',
+								'downloadPNG', 'downloadJPEG', 'downloadSVG', 'downloadPDF',
+								'separator', 'printChart']
+						}
+					}
+				}
+			});
+		}
+
+		// Datepickers
+		$('#input_start_date, #input_end_date').datepicker({
+			changeMonth: true, changeYear: true, dateFormat: 'dd/mm/yy', showAnim: '', firstDay: 1
+		});
+
+		// Select2
+		$('.select2').select2({ width: '100%', allowClear: true, placeholder: '— Tous —' });
+
+		// Region → District → Site cascades
+		$('#select_region').on('change', function() {
+			const r = $(this).val();
+			if (!r) return;
+			$.get('district/names_by_regions?regions=' + r, function(districts) {
+				const $d = $('#select_district');
+				$d.empty().append('<option value=""></option>');
+				$.each(districts, (i, d) => $d.append('<option value="' + d.id + '">' + d.name + '</option>'));
+				$d.val(null).trigger('change');
+			});
+		});
+		$('#select_district').on('change', function() {
+			const d = $(this).val();
+			if (!d) return;
+			$.get('site/names_by_districts?districts=' + d, function(sites) {
+				const $s = $('#select_site');
+				$s.empty().append('<option value=""></option>');
+				$.each(sites, (i, s) => $s.append('<option value="' + s.id + '">' + s.name + '</option>'));
+				$s.val(null).trigger('change');
+			});
+		});
+
+		// Date presets
+		$('.date-presets .btn').on('click', function() {
+			const p = $(this).data('preset');
+			const today = new Date();
+			const fmt = d => {
+				const pad = n => String(n).padStart(2, '0');
+				return pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear();
+			};
+			let start = '', end = fmt(today);
+			if (p === 'today')      { start = fmt(today); }
+			else if (p === '7d')    { const s = new Date(today); s.setDate(today.getDate() - 7); start = fmt(s); }
+			else if (p === '30d')   { const s = new Date(today); s.setDate(today.getDate() - 30); start = fmt(s); }
+			else if (p === 'month') { start = fmt(new Date(today.getFullYear(), today.getMonth(), 1)); }
+			else if (p === 'ytd')   { start = fmt(new Date(today.getFullYear(), 0, 1)); }
+			$('#input_start_date').val(start);
+			$('#input_end_date').val(end);
+			loadAll();
+		});
+
+		$('#btnApplyFilters').on('click', loadAll);
+		$('#btnResetFilters').on('click', function() {
+			$('#input_start_date, #input_end_date').val('');
+			$('#select_region, #select_district, #select_site, #select_lab').val(null).trigger('change.select2');
+			loadAll();
+		});
+
+		// Toggle collapse du panneau filtres (clic sur l'en-tête)
+		$('#dashboardFiltersHeader').on('click', function() {
+			$('#dashboardFiltersPanel').toggleClass('collapsed');
+		});
+		$('#granularitySelect').on('change', function() {
+			if (window._lastSeriesData) renderTimeSeries(window._lastSeriesData, this.value);
+		});
+		$('#showEmptyZones').on('change', function() {
+			// Re-render top-level + collapse any expanded children (they were
+			// fetched with the old filter, simpler to re-expand on demand)
+			$('#drillTableBody tr[data-parent], #drillTableBody tr[data-ancestor]').remove();
+			$('#drillTableBody .expander').each(function() { if ($(this).text() === '▼') $(this).text('▶'); });
+			renderDrillRegions();
+		});
+
+		loadAll();
+	});
+
+	function currentFilters() {
+		return {
+			startDate: isoFromFr($('#input_start_date').val()),
+			endDate: isoFromFr($('#input_end_date').val()),
+			region: $('#select_region').val() || null,
+			district: $('#select_district').val() || null,
+			site: $('#select_site').val() || null,
+			lab: $('#select_lab').val() || null
+		};
+	}
+
+	function loadAll() {
+		loadFunnelAndKpis();
+		loadCoverage();
+		loadTypeBreakdown();
+		loadChartStatusByType();
+		loadChartSeries();
+		loadChartDurations();
+		loadDrillRegions();
+		loadTopPerformers();
+	}
+
+	function loadFunnelAndKpis() {
+		const f = currentFilters();
+		$.when(
+			$.get('dashboard/data/funnel', f),
+			$.get('dashboard/data/funnel-previous', f)
+		).done(function(currResp, prevResp) {
+			const curr = currResp[0] || {};
+			const prev = prevResp[0] || {};
+			updateKpis(curr, prev);
+		}).fail(function() {
+			$('[data-kpi]').text('—');
+		});
+	}
+
+	function updateKpis(curr, prev) {
+		const map = {
+			total: 'total', in_transit: 'in_transit', at_hub: 'at_hub', at_lab: 'at_lab',
+			analysed: 'analysed', result_collected: 'result_collected',
+			delivered: 'delivered', tat_avg_days: 'tat_avg_days',
+			non_conform: 'non_conform', failed: 'failed'
+		};
+		Object.entries(map).forEach(function(p) {
+			const v = num(curr[p[1]]);
+			$('[data-kpi="' + p[0] + '"]').text(formatNumber(v));
+			renderTrend('[data-trend="' + p[0] + '"]', v, num(prev[p[1]]));
+		});
+	}
+
+	function renderTrend(selector, curr, prev) {
+		const $el = $(selector);
+		if (prev === 0 && curr === 0) { $el.html('<span class="kpi-trend-flat">—</span>'); return; }
+		if (prev === 0) { $el.html('<span class="kpi-trend-up"><i class="fas fa-arrow-up"></i> nouveau</span>'); return; }
+		const diff = curr - prev;
+		const pct = Math.round(100 * diff / prev);
+		if (Math.abs(pct) < 1) {
+			$el.html('<span class="kpi-trend-flat"><i class="fas fa-minus"></i> stable</span>');
+		} else if (diff > 0) {
+			$el.html('<span class="kpi-trend-up"><i class="fas fa-arrow-up"></i> +' + pct + '% vs préc.</span>');
+		} else {
+			$el.html('<span class="kpi-trend-down"><i class="fas fa-arrow-down"></i> ' + pct + '% vs préc.</span>');
+		}
+	}
+
+	function loadCoverage() {
+		const f = currentFilters();
+		$.get('dashboard/data/coverage', f, function(c) {
+			['active_sites','total_sites','active_districts','total_districts',
+			 'active_regions','total_regions','active_conveyors','active_labs','total_labs',
+			 'total_distance_km','avg_distance_per_sample_km'].forEach(function(k) {
+				$('[data-cov="' + k + '"]').text(formatNumber(c[k]));
+			});
+			setBar('sites', c.active_sites, c.total_sites);
+			setBar('districts', c.active_districts, c.total_districts);
+			setBar('regions', c.active_regions, c.total_regions);
+			setBar('labs', c.active_labs, c.total_labs);
+		});
+	}
+
+	function setBar(key, active, total) {
+		const pct = num(total) > 0 ? Math.round(100 * num(active) / num(total)) : 0;
+		$('[data-cov-bar="' + key + '"]').css('width', pct + '%').attr('title', pct + '%');
+	}
+
+	function loadTypeBreakdown() {
+		const f = currentFilters();
+		$.get('dashboard/data/type-breakdown', f, function(rows) {
+			const data = (rows || []).map(r => ({ name: r.sample_type || '—', y: num(r.total) }));
+			Highcharts.chart('type-breakdown-chart', {
+				chart: { type: 'bar', backgroundColor: 'transparent', spacing: [0, 0, 0, 0] },
+				title: { text: null },
+				credits: { enabled: false },
+				exporting: { enabled: false },
+				legend: { enabled: false },
+				xAxis: { type: 'category', labels: { style: { fontSize: '10px' } }, lineWidth: 0, tickWidth: 0 },
+				yAxis: { title: { text: null }, gridLineWidth: 0, labels: { enabled: false }, min: 0 },
+				plotOptions: {
+					bar: {
+						colorByPoint: true,
+						colors: ['#3b82f6','#16a34a','#f59e0b','#8b5cf6','#06b6d4','#ec4899','#dc2626'],
+						dataLabels: { enabled: true, format: '{point.y}', style: { fontSize: '10px', fontWeight: 600 } },
+						borderRadius: 3
+					}
+				},
+				series: [{ name: 'Échantillons', data: data }]
+			});
+		});
+	}
+
+	function loadChartStatusByType() {
+		const f = currentFilters();
+		$.get('dashboard/sample_status_by_sample_type', f, function(data) {
+			Highcharts.chart('chart_status_by_type', {
+				chart: { type: 'column' },
+				title: { text: null },
+				credits: { enabled: false },
+				exporting: { chartOptions: { title: { text: "Échantillons par type — statuts" } } },
+				xAxis: { categories: data.categories || [], crosshair: true },
+				yAxis: { title: { text: "Nombre d'échantillons" }, allowDecimals: false, min: 0 },
+				legend: { enabled: true, itemStyle: { fontSize: '11px' } },
+				plotOptions: { series: { dataLabels: { enabled: false } } },
+				tooltip: { shared: true, useHTML: true },
+				series: [
+					{ name: 'Collectés', data: data.collected || [], color: '#3b82f6' },
+					{ name: 'Transmis/Déposés', data: data.delivered || [], color: '#06b6d4' },
+					{ name: 'Analyses terminées', data: data.analysisDone || [], color: '#4f46e5' },
+					{ name: 'Résultats collectés', data: data.resultCollected || [], color: '#ec4899' },
+					{ name: 'Résultats livrés', data: data.resultOnSite || [], color: '#16a34a' },
+					{ name: 'Rejets', data: data.nonConform || [], color: '#dc2626' }
+				]
+			});
+		});
+	}
+
+	function loadChartSeries() {
+		const f = currentFilters();
+		$.get('dashboard/data/series', f, function(res) {
+			window._lastSeriesData = res;
+			renderTimeSeries(res, $('#granularitySelect').val() || 'day');
+		});
+	}
+
+	function renderTimeSeries(res, granularity) {
+		Highcharts.chart('chart_series', {
+			chart: { type: 'line' },
+			title: { text: null },
+			credits: { enabled: false },
+			exporting: { chartOptions: { title: { text: "Évolution dans le temps (granularité : " + granularity + ")" } } },
+			xAxis: { type: 'datetime' },
+			yAxis: { title: { text: 'Nombre' }, allowDecimals: false, min: 0 },
+			legend: { enabled: true, itemStyle: { fontSize: '11px' } },
+			tooltip: { shared: true },
+			series: [
+				{ name: 'Collectés', data: bucketize(res.collected, granularity), color: '#3b82f6' },
+				{ name: 'Déposés', data: bucketize(res.deposited, granularity), color: '#06b6d4' },
+				{ name: 'Analysés', data: bucketize(res.analysed, granularity), color: '#4f46e5' },
+				{ name: 'Livrés', data: bucketize(res.delivered, granularity), color: '#16a34a' }
+			]
+		});
+	}
+
+	function loadChartDurations() {
+		const f = currentFilters();
+		$.get('dashboard/data/step-durations', f, function(rows) {
+			const steps = [
+				'collecte→dépôt',
+				'dépôt→réception',
+				'réception→analyse',
+				'analyse→résultat prêt',
+				'résultat prêt→collecte résultat',
+				'collecte résultat→dépôt résultat'
+			];
+			const byType = {};
+			(rows || []).forEach(function(r) {
+				if (!byType[r.sampleType]) byType[r.sampleType] = {};
+				byType[r.sampleType][r.step] = num(r.medianDays);
+			});
+			const series = Object.keys(byType).sort().map(function(type) {
+				return {
+					name: type, type: 'column',
+					data: steps.map(s => byType[type][s] || 0),
+					tooltip: { valueSuffix: ' j' }
+				};
+			});
+			Highcharts.chart('chart_durations', {
+				title: { text: null },
+				credits: { enabled: false },
+				exporting: { chartOptions: { title: { text: "Durée médiane par étape (jours) — par type d'échantillon" } } },
+				xAxis: { categories: steps, labels: { style: { fontSize: '10px' } } },
+				yAxis: { title: { text: 'Jours (médiane)' }, min: 0, allowDecimals: false },
+				legend: { enabled: true, itemStyle: { fontSize: '11px' } },
+				plotOptions: { series: { dataLabels: { enabled: true, format: '{y} j', style: { fontSize: '10px' } } } },
+				tooltip: { shared: true, useHTML: true },
+				series: series
+			});
+		});
+	}
+
+	function loadDrillRegions() {
+		const f = currentFilters();
+		$.get('dashboard/data/by-region', { startDate: f.startDate, endDate: f.endDate }, function(rows) {
+			window._drillRegions = rows || [];
+			renderDrillRegions();
+		});
+	}
+
+	function renderDrillRegions() {
+		const showEmpty = $('#showEmptyZones').is(':checked');
+		let rows = window._drillRegions || [];
+		const totalRowsRaw = rows.length;
+		if (!showEmpty) rows = rows.filter(r => num(r.total) > 0);
+		const $body = $('#drillTableBody').empty();
+		if (!rows.length) {
+			if (totalRowsRaw === 0) {
+				$body.append('<tr><td colspan="6" class="empty-state">Aucune donnée pour la période sélectionnée.</td></tr>');
+			} else {
+				$body.append('<tr><td colspan="6" class="empty-state">Aucune zone avec activité sur la période. '
+					+ '<a href="#" id="lnkShowEmpty">Afficher toutes les zones</a></td></tr>');
+				$('#lnkShowEmpty').on('click', function(e) {
+					e.preventDefault();
+					$('#showEmptyZones').prop('checked', true).trigger('change');
+				});
+			}
+			return;
+		}
+		rows.forEach(function(r) { $body.append(renderDrillRow('region', r, 0)); });
+	}
+
+	function renderDrillRow(level, r, indent) {
+		const id = (r.region_id || r.district_id || r.site_id);
+		const name = r.region || r.district || r.site;
+		const cls = 'drill-' + level;
+		const expander = level === 'site'
+			? '<span class="expander placeholder">·</span>'
+			: '<span class="expander" data-toggle="' + level + '" data-id="' + id + '" onclick="toggleDrill(this)">▶</span>';
+		const indentCls = indent === 1 ? 'indent-1' : (indent === 2 ? 'indent-2' : '');
+		return '<tr class="' + cls + '" data-row-id="' + level + '-' + id + '">'
+			+ '<td><span class="' + indentCls + '">' + expander + ' ' + escapeHtml(name || '—') + '</span></td>'
+			+ '<td class="num">' + formatNumber(r.total) + '</td>'
+			+ '<td class="num">' + formatNumber(r.in_transit) + '</td>'
+			+ '<td class="num">' + formatNumber(r.delivered) + '</td>'
+			+ '<td class="num">' + formatNumber(r.rejected) + '</td>'
+			+ '<td class="num">' + renderTat(r.tat_avg_days, r.total) + '</td>'
+			+ '</tr>';
+	}
+
+	function renderTat(days, total) {
+		if (!total || num(total) === 0) return '<span class="tat-pill tat-na">—</span>';
+		const d = num(days);
+		const cls = d < 3 ? 'tat-green' : (d < 7 ? 'tat-orange' : 'tat-red');
+		return '<span class="tat-pill ' + cls + '">' + d + ' j</span>';
+	}
+
+	function toggleDrill(btn) {
+		const $btn = $(btn);
+		const level = $btn.data('toggle');
+		const id = $btn.data('id');
+		const $parent = $btn.closest('tr');
+		const rowMarker = level + '-' + id;
+		if ($btn.text() === '▼') {
+			$btn.text('▶');
+			$('tr[data-parent="' + rowMarker + '"]').remove();
+			$('tr[data-ancestor*="' + rowMarker + '"]').remove();
+			return;
+		}
+		const f = currentFilters();
+		const url = level === 'region' ? 'dashboard/data/by-district?region=' + id
+			: 'dashboard/data/by-site?district=' + id;
+		const startDate = f.startDate ? '&startDate=' + f.startDate : '';
+		const endDate = f.endDate ? '&endDate=' + f.endDate : '';
+		$.get(url + startDate + endDate, function(rows) {
+			$btn.text('▼');
+			const showEmpty = $('#showEmptyZones').is(':checked');
+			const totalRowsRaw = rows.length;
+			let filtered = rows;
+			if (!showEmpty) filtered = filtered.filter(r => num(r.total) > 0);
+			if (!filtered.length) {
+				const msg = totalRowsRaw === 0 ? 'Aucun élément'
+					: 'Aucun élément avec activité (' + totalRowsRaw + ' masqué' + (totalRowsRaw > 1 ? 's' : '') + ')';
+				const $empty = $('<tr><td colspan="6" class="text-muted-sm" style="padding:.4rem 1rem;"></td></tr>')
+					.attr('data-parent', rowMarker);
+				$empty.find('td').text(msg);
+				$parent.after($empty);
+				return;
+			}
+			const childLevel = level === 'region' ? 'district' : 'site';
+			const indent = level === 'region' ? 1 : 2;
+			filtered.slice().reverse().forEach(function(r) {
+				const $row = $(renderDrillRow(childLevel, r, indent))
+					.attr('data-parent', rowMarker)
+					.attr('data-ancestor', rowMarker);
+				$parent.after($row);
+			});
+		});
+	}
+
+	function loadTopPerformers() {
+		const f = currentFilters();
+		$.get('dashboard/data/top-performers', { startDate: f.startDate, endDate: f.endDate, limit: 5 }, function(resp) {
+			renderRanking('#topRejectionSites', resp.rejection_sites, function(r) {
+				return {
+					name: escapeHtml(r.site || '—'),
+					sub: escapeHtml((r.district || '') + ' · ' + (r.region || '')),
+					metric: r.rejection_rate + '% (' + r.rejected + '/' + r.total + ')'
+				};
+			});
+			renderRanking('#slowestLabs', resp.slowest_labs, function(r) {
+				return {
+					name: escapeHtml(r.lab || '—'),
+					sub: r.total + ' échantillons',
+					metric: r.avg_tat_days + ' j'
+				};
+			});
+			renderRanking('#topConveyors', resp.top_conveyors, function(r) {
+				const fullName = ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || r.login || '—';
+				return {
+					name: escapeHtml(fullName),
+					sub: r.rejected > 0 ? (r.rejection_rate + '% rejets') : 'Aucun rejet',
+					metric: r.samples_handled + ' éch.'
+				};
+			});
+		});
+	}
+
+	function renderRanking(selector, rows, mapper) {
+		const $el = $(selector).empty();
+		if (!rows || !rows.length) {
+			$el.append('<li class="text-muted-sm">Aucune donnée pour la période</li>');
+			return;
+		}
+		rows.forEach(function(r) {
+			const m = mapper(r);
+			$el.append('<li>'
+				+ '<div><div class="name">' + m.name + '</div><div class="sub">' + m.sub + '</div></div>'
+				+ '<div class="metric">' + m.metric + '</div>'
+				+ '</li>');
+		});
+	}
+
+	// ===== Helpers =====
+	function isoFromFr(s) {
+		if (!s) return null;
+		const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+		return m ? (m[3] + '-' + m[2] + '-' + m[1]) : null;
+	}
+	function num(v) {
+		if (v === null || v === undefined) return 0;
+		if (typeof v === 'number') return v;
+		const n = Number(v);
+		return isNaN(n) ? 0 : n;
+	}
+	function formatNumber(v) {
+		const n = num(v);
+		return n.toLocaleString('fr-FR');
+	}
+	function escapeHtml(str) {
+		if (str == null) return '';
+		return String(str).replace(/[&<>"']/g, function(c) {
+			return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+		});
+	}
+	function toUTC(ts) {
+		if (typeof ts !== 'string') return ts;
+		const parts = ts.split('-').map(Number);
+		return Date.UTC(parts[0], parts[1] - 1, parts[2]);
+	}
+	function startOfWeekUTC(ts) {
+		const d = new Date(ts);
+		const dow = (d.getUTCDay() + 6) % 7;
+		d.setUTCDate(d.getUTCDate() - dow);
+		d.setUTCHours(0, 0, 0, 0);
+		return d.getTime();
+	}
+	function startOfMonthUTC(ts) {
+		const d = new Date(ts);
+		return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+	}
+	function bucketize(data, granularity) {
+		const map = new Map();
+		(data || []).forEach(function(pt) {
+			const ts = toUTC(pt.day);
+			let key;
+			if (granularity === 'week') key = startOfWeekUTC(ts);
+			else if (granularity === 'month') key = startOfMonthUTC(ts);
+			else key = new Date(ts).setUTCHours(0, 0, 0, 0);
+			map.set(key, (map.get(key) || 0) + num(pt.cnt));
+		});
+		return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
+	}
+	</script>
+
+</body>
+</html>

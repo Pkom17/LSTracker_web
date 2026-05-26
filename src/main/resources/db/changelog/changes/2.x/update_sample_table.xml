@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd
+    http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+
+	<changeSet id="add-uuid-column-to-sample" author="pkomena">
+		<addColumn tableName="sample">
+			<column name="uuid" type="varchar(255)">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="add-items-to-sample_type" author="pkomena">
+		<preConditions onError="CONTINUE" onFail="CONTINUE">
+			<sqlCheck expectedResult="0">
+				select count(*) from
+				sample_tracker.sample_type where name = 'PrEP';
+			</sqlCheck>
+		</preConditions>
+		<sqlFile path="../sql/add_sample_type_01.sql"
+			relativeToChangelogFile="true" />
+	</changeSet>
+
+	<changeSet id="add-sample_nature-column-to-sample"
+		author="pkomena">
+		<addColumn tableName="sample">
+			<column name="sample_nature" type="varchar(255)">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="add-requester_site_id-column-to-sample"
+		author="pkomena">
+		<addColumn tableName="sample">
+			<column name="requester_site_id" type="INT">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="add-rejection-date-column-to-sample-rejection"
+		author="pkomena">
+		<addColumn tableName="sample_rejection">
+			<column name="rejection_date" type="TIMESTAMP">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet
+		id="add-conveyor-and-result-collector-id-to-sample" author="pkomena">
+		<addColumn tableName="sample">
+			<column name="sample_conveyor_id" type="BIGINT">
+				<constraints nullable="true" />
+			</column>
+			<column name="result_collector_id" type="BIGINT">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="add-sample-referring-id-to-sample"
+		author="pkomena">
+		<addColumn tableName="sample">
+			<column name="sample_referring_id" type="varchar(200)">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="add-pickup-date-to-sample" author="pkomena">
+		<addColumn tableName="sample">
+			<column name="pickup_date" type="TIMESTAMP">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+
+	<changeSet id="add-site-code-to-sample" author="pkomena">
+		<addColumn tableName="sample">
+			<column name="requester_site_code" type="varchar(64)" />
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="drop-sample_retrieving_id-not-null-constraint"
+		author="pkomena">
+		<dropNotNullConstraint tableName="sample"
+			columnName="sample_retrieving_id" columnDataType="int" />
+	</changeSet>
+
+	<changeSet id="change-sample_referring-id-type"
+		author="pkomena">
+		<update tableName="sample">
+			<column name="sample_referring_id" type="varchar(200)"
+				value="null"></column>
+			<where>1=1</where>
+		</update>
+		<modifyDataType tableName="sample"
+			columnName="sample_referring_id" newDataType="INT" />
+	</changeSet>
+
+
+</databaseChangeLog>

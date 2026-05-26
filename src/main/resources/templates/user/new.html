@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:th="http://www.thymeleaf.org"
+	xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity6">
+
+<head th:replace="~{fragments/header :: head}">
+<title>Nouvel utilisateur</title>
+</head>
+
+<body class="sb-nav-fixed">
+
+<style>
+/* ===== Page layout ===== */
+.form-wrap {
+	max-width: 1000px;
+	margin: 0 auto;
+	padding-bottom: 6rem; /* room for sticky save bar */
+}
+
+/* ===== Page header bar ===== */
+.form-header {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	align-items: center;
+	padding: 1rem 1.25rem;
+	background: #fff;
+	border: 1px solid #e6e9f3;
+	border-radius: .75rem;
+	margin-bottom: 1rem;
+	box-shadow: 0 1px 3px rgba(0,0,0,.03);
+}
+.form-header h1 {
+	font-size: 1.1rem;
+	margin: 0;
+	color: #1f2937;
+	font-weight: 600;
+}
+.form-header h1 i { color: #4f46e5; margin-right: .35rem; }
+.form-header .meta { font-size: .75rem; color: #6b7280; margin-top: .15rem; }
+
+/* ===== Section cards ===== */
+.section-card {
+	background: #fff;
+	border: 1px solid #e6e9f3;
+	border-radius: .75rem;
+	margin-bottom: 1rem;
+	overflow: hidden;
+	box-shadow: 0 1px 3px rgba(0,0,0,.03);
+}
+.section-card .section-header {
+	background: #f8fafc;
+	padding: .75rem 1.25rem;
+	border-bottom: 1px solid #e6e9f3;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	cursor: pointer;
+	user-select: none;
+}
+.section-card .section-header h2 {
+	font-size: .95rem;
+	margin: 0;
+	color: #1f2937;
+	font-weight: 600;
+}
+.section-card .section-header h2 .step-num {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.5rem;
+	height: 1.5rem;
+	border-radius: 50%;
+	background: #4f46e5;
+	color: #fff;
+	font-size: .7rem;
+	margin-right: .5rem;
+}
+.section-card .section-body { padding: 1.25rem; }
+.section-card.collapsed .section-body { display: none; }
+.section-card .toggle-icon { transition: transform .2s; color: #6b7280; }
+.section-card.collapsed .toggle-icon { transform: rotate(-90deg); }
+
+/* Password section emphasis */
+.section-card.section-password .section-header { background: #fffbeb; }
+.section-card.section-password .section-header h2 .step-num { background: #f59e0b; }
+.section-card.section-password .section-header h2 i { color: #f59e0b; }
+
+/* ===== Form fields ===== */
+.field { margin-bottom: .75rem; }
+.field label {
+	display: block;
+	font-size: .72rem;
+	text-transform: uppercase;
+	font-weight: 600;
+	color: #6b7280;
+	letter-spacing: .03em;
+	margin-bottom: .25rem;
+}
+.field label .req { color: #dc2626; }
+.field .hint {
+	display: block;
+	font-size: .7rem;
+	color: #9ca3af;
+	margin-top: .15rem;
+}
+.field .invalid-feedback { display: block; }
+
+/* Password policy */
+.policy {
+	background: #fffbeb;
+	border: 1px solid #fde68a;
+	border-radius: .5rem;
+	padding: .65rem .85rem;
+	font-size: .8rem;
+	color: #78350f;
+	margin-bottom: 1rem;
+}
+.policy ul { margin: .3rem 0 0; padding-left: 1.1rem; }
+.policy li { margin: .15rem 0; }
+
+/* Password input with toggle eye */
+.password-input-group { position: relative; }
+.password-input-group input { padding-right: 2.5rem; }
+.password-input-group .toggle-eye {
+	position: absolute;
+	right: .35rem;
+	top: 50%;
+	transform: translateY(-50%);
+	background: none;
+	border: none;
+	color: #6b7280;
+	cursor: pointer;
+	padding: .35rem .5rem;
+}
+.password-input-group .toggle-eye:hover { color: #1f2937; }
+
+/* Form switches */
+.form-switch .form-check-input { cursor: pointer; }
+
+/* ===== Sticky save bar ===== */
+.save-bar {
+	background: #f8fafc;
+	border-top: 1px solid #e6e9f3;
+	padding: .85rem 1.25rem;
+	margin-top: .5rem;
+	border-radius: .5rem;
+	display: flex;
+	justify-content: flex-end;
+	gap: .5rem;
+}
+
+/* Select2 height tweak */
+.select2-container--default .select2-selection--single {
+	height: calc(1.5em + .75rem + 2px) !important;
+	display: flex !important;
+	align-items: center !important;
+}
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+	height: 100% !important;
+	top: 50% !important;
+	transform: translateY(-50%) !important;
+	right: .5rem !important;
+}
+
+/* Alerts */
+.alert-flash { border-radius: .5rem; font-size: .9rem; }
+</style>
+
+	<div class="d-flex" id="wrapper">
+		<div id="page-content-wrapper">
+
+			<div th:insert="~{fragments/header :: header(content='Nouvel utilisateur', module='setting')}"></div>
+
+			<div class="container-fluid py-3 form-wrap">
+
+				<!-- ===== Page header ===== -->
+				<div class="form-header">
+					<div>
+						<h1><i class="fas fa-user-plus"></i>Nouvel utilisateur</h1>
+						<div class="meta">Création d'un compte utilisateur</div>
+					</div>
+					<div class="ms-auto">
+						<a th:href="@{/appuser}" class="btn btn-sm btn-outline-secondary">
+							<i class="fas fa-arrow-left me-1"></i> Retour à la liste
+						</a>
+					</div>
+				</div>
+
+				<!-- Flash messages -->
+				<div th:if="${message_error != null}" class="alert alert-danger alert-flash" th:text="${message_error}"></div>
+				<div th:if="${message_success != null}" class="alert alert-success alert-flash" th:text="${message_success}"></div>
+
+				<form th:object="${userDTO}" th:action="@{/appuser/new}" method="post" id="userForm" novalidate>
+
+					<!-- ============ SECTION 1 : IDENTITÉ ============ -->
+					<section class="section-card" data-section="identity">
+						<div class="section-header" onclick="toggleSection(this)">
+							<h2><span class="step-num">1</span>Identité</h2>
+							<i class="fas fa-chevron-down toggle-icon"></i>
+						</div>
+						<div class="section-body">
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="inputLogin">Identifiant <span class="req">*</span></label>
+									<input th:field="*{login}" type="text" id="inputLogin"
+										class="form-control form-control-sm"
+										th:classappend="${#fields.hasErrors('login')} ? ' is-invalid' : ''"
+										pattern="^[0-9a-zA-Z]{5,20}$" maxlength="20" required/>
+									<span class="hint">5-20 caractères alphanumériques uniques</span>
+									<div class="invalid-feedback" th:if="${#fields.hasErrors('login')}" th:errors="*{login}">Erreur</div>
+								</div>
+								<div class="col-md-6 field">
+									<label for="inputContact">Téléphone <span class="req">*</span></label>
+									<input th:field="*{phoneContact}" type="text" id="inputContact"
+										class="form-control form-control-sm"
+										th:classappend="${#fields.hasErrors('phoneContact')} ? ' is-invalid' : ''"
+										pattern="^((00225)?|(\+225)?)([\d]{10})$" required/>
+									<span class="hint">10 chiffres, optionnellement préfixé par +225 ou 00225</span>
+									<div class="invalid-feedback" th:if="${#fields.hasErrors('phoneContact')}" th:errors="*{phoneContact}">Erreur</div>
+								</div>
+							</div>
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="inputLastName">Nom</label>
+									<input th:field="*{lastName}" type="text" id="inputLastName"
+										class="form-control form-control-sm" maxlength="100"/>
+								</div>
+								<div class="col-md-6 field">
+									<label for="inputFirstName">Prénoms</label>
+									<input th:field="*{firstName}" type="text" id="inputFirstName"
+										class="form-control form-control-sm" maxlength="100"/>
+								</div>
+							</div>
+						</div>
+					</section>
+
+					<!-- ============ SECTION 2 : COMPTE ============ -->
+					<section class="section-card" data-section="account">
+						<div class="section-header" onclick="toggleSection(this)">
+							<h2><span class="step-num">2</span>Compte</h2>
+							<i class="fas fa-chevron-down toggle-icon"></i>
+						</div>
+						<div class="section-body">
+							<div class="row">
+								<div class="col-md-4 field">
+									<label for="inputUserType">Type d'utilisateur <span class="req">*</span></label>
+									<select id="inputUserType" th:field="*{userType}"
+										class="form-select form-select-sm select2" required>
+										<option value=""></option>
+										<option th:each="t : ${userTypes}" th:value="${t}" th:text="${t.type}"></option>
+									</select>
+								</div>
+								<div class="col-md-4 field">
+									<label for="inputUserLevel">Niveau organisation <span class="req">*</span></label>
+									<select id="inputUserLevel" th:field="*{userLevel}"
+										class="form-select form-select-sm select2" required>
+										<option value=""></option>
+										<option th:each="l : ${userLevels}" th:value="${l}" th:text="${l.level}"></option>
+									</select>
+								</div>
+								<div class="col-md-4 field">
+									<label for="inputRole">Rôle <span class="req">*</span></label>
+									<select id="inputRole" th:field="*{role}"
+										class="form-select form-select-sm select2" required>
+										<option value=""></option>
+										<option th:each="r : ${userRoles}" th:value="${r}" th:text="${r.role}"></option>
+									</select>
+								</div>
+							</div>
+
+							<div class="row mt-2">
+								<div class="col-md-6 field">
+									<div class="form-check form-switch">
+										<input class="form-check-input" type="checkbox"
+											th:field="*{active}" id="inputActive"
+											th:checked="${userDTO.active}"/>
+										<label class="form-check-label" for="inputActive" style="text-transform:none; letter-spacing:normal; font-size:.85rem; color:#1f2937;">
+											<i class="fas fa-check-circle text-success"></i> Compte actif
+										</label>
+									</div>
+									<span class="hint">Si désactivé, l'utilisateur ne pourra pas se connecter.</span>
+								</div>
+								<div class="col-md-6 field">
+									<div class="form-check form-switch">
+										<input class="form-check-input" type="checkbox"
+											th:field="*{locked}" id="inputLocked"
+											th:checked="${userDTO.locked}"/>
+										<label class="form-check-label" for="inputLocked" style="text-transform:none; letter-spacing:normal; font-size:.85rem; color:#1f2937;">
+											<i class="fas fa-lock text-danger"></i> Compte verrouillé
+										</label>
+									</div>
+									<span class="hint">Verrouille temporairement l'accès au compte.</span>
+								</div>
+							</div>
+						</div>
+					</section>
+
+					<!-- ============ SECTION 3 : MOT DE PASSE ============ -->
+					<section class="section-card section-password" data-section="password">
+						<div class="section-header" onclick="toggleSection(this)">
+							<h2><span class="step-num">3</span><i class="fas fa-key"></i>Mot de passe</h2>
+							<i class="fas fa-chevron-down toggle-icon"></i>
+						</div>
+						<div class="section-body">
+
+							<div class="policy">
+								<strong><i class="fas fa-info-circle"></i> Politique de mot de passe</strong>
+								<ul>
+									<li>8 caractères minimum</li>
+									<li>Au moins 1 majuscule</li>
+									<li>Au moins 1 minuscule</li>
+									<li>Au moins 1 chiffre</li>
+									<li>Au moins 1 caractère spécial (ex. <code>!@#$%&amp;*</code>)</li>
+								</ul>
+							</div>
+
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="inputPassword">Mot de passe <span class="req">*</span></label>
+									<div class="password-input-group">
+										<input th:field="*{password}" type="password" id="inputPassword"
+											class="form-control form-control-sm"
+											th:classappend="${#fields.hasErrors('password')} ? ' is-invalid' : ''"
+											autocomplete="new-password" minlength="8" maxlength="20" required/>
+										<button class="toggle-eye" type="button" tabindex="-1"
+											onclick="togglePassword('inputPassword', this)">
+											<i class="fas fa-eye"></i>
+										</button>
+									</div>
+									<div class="invalid-feedback" th:if="${#fields.hasErrors('password')}" th:errors="*{password}">Erreur</div>
+								</div>
+								<div class="col-md-6 field">
+									<label for="inputRepassword">Confirmer le mot de passe <span class="req">*</span></label>
+									<div class="password-input-group">
+										<input th:field="*{repassword}" type="password" id="inputRepassword"
+											class="form-control form-control-sm"
+											autocomplete="new-password" minlength="8" maxlength="20" required/>
+										<button class="toggle-eye" type="button" tabindex="-1"
+											onclick="togglePassword('inputRepassword', this)">
+											<i class="fas fa-eye"></i>
+										</button>
+									</div>
+								</div>
+							</div>
+						</div>
+					</section>
+
+					<!-- ============ SECTION 4 : EXPIRATION ============ -->
+					<section class="section-card" data-section="expiration">
+						<div class="section-header" onclick="toggleSection(this)">
+							<h2><span class="step-num">4</span>Expiration (optionnel)</h2>
+							<i class="fas fa-chevron-down toggle-icon"></i>
+						</div>
+						<div class="section-body">
+							<div class="row">
+								<div class="col-md-6 field">
+									<label for="inputPasswordExpireAt">Date d'expiration du mot de passe</label>
+									<input th:field="*{passwordExpireAt}" type="text" id="inputPasswordExpireAt"
+										class="form-control form-control-sm" autocomplete="off"
+										placeholder="jj/mm/aaaa"/>
+									<span class="hint">Laissez vide pour aucune expiration.</span>
+								</div>
+							</div>
+						</div>
+					</section>
+
+				</form>
+
+				<div class="save-bar">
+		<a th:href="@{/appuser}" class="btn btn-outline-secondary">Annuler</a>
+		<button type="submit" form="userForm" class="btn btn-primary">
+			<i class="fas fa-save me-1"></i> Enregistrer
+		</button>
+	</div>
+
+			</div>
+		</div>
+	</div>
+
+	<!-- ===== Sticky save bar ===== -->
+	<footer class="py-4 bg-light mt-auto" th:insert="~{fragments/footer :: footer}"></footer>
+
+	<script th:src="@{/webjars/jquery/3.6.0/jquery.min.js}"></script>
+	<script th:src="@{/webjars/jquery-ui/1.13.2/jquery-ui.min.js}"></script>
+	<script th:src="@{/webjars/bootstrap/5.1.3/js/bootstrap.bundle.min.js}"></script>
+	<script th:src="@{/webjars/font-awesome/5.15.4/js/all.js}"></script>
+	<script th:src="@{/webjars/select2/4.0.13/js/select2.min.js}"></script>
+
+	<script th:inline="none">
+	/* eslint-disable */
+	$(function() {
+		$('.select2').select2({ width: '100%', allowClear: true, placeholder: '— Sélectionner —' });
+		$(document).on('select2:open', function() {
+			const el = document.querySelector('.select2-search__field');
+			if (el) el.focus();
+		});
+
+		// Datepicker
+		$('#inputPasswordExpireAt').datepicker({
+			changeMonth: true,
+			changeYear: true,
+			dateFormat: 'dd/mm/yy',
+			minDate: new Date()
+		});
+
+		// Restore collapsed sections
+		try {
+			const collapsed = JSON.parse(sessionStorage.getItem('userFormCollapsed') || '[]');
+			collapsed.forEach(function(s) {
+				$('.section-card[data-section="' + s + '"]').addClass('collapsed');
+			});
+		} catch (e) {}
+	});
+
+	function toggleSection(headerEl) {
+		const card = headerEl.closest('.section-card');
+		card.classList.toggle('collapsed');
+		const collapsed = [];
+		document.querySelectorAll('.section-card.collapsed').forEach(function(c) {
+			collapsed.push(c.dataset.section);
+		});
+		sessionStorage.setItem('userFormCollapsed', JSON.stringify(collapsed));
+	}
+
+	function togglePassword(inputId, btn) {
+		const input = document.getElementById(inputId);
+		if (!input) return;
+		const icon = btn.querySelector('i');
+		if (input.type === 'password') {
+			input.type = 'text';
+			icon.classList.remove('fa-eye');
+			icon.classList.add('fa-eye-slash');
+		} else {
+			input.type = 'password';
+			icon.classList.remove('fa-eye-slash');
+			icon.classList.add('fa-eye');
+		}
+	}
+
+	// Validation côté client : password === repassword
+	document.getElementById('userForm').addEventListener('submit', function(e) {
+		const p = document.getElementById('inputPassword').value || '';
+		const r = document.getElementById('inputRepassword').value || '';
+		if (p !== r) {
+			e.preventDefault();
+			alert('Le mot de passe et sa confirmation ne correspondent pas.');
+			return;
+		}
+		// Native HTML5 validation feedback
+		const form = this;
+		if (!form.checkValidity()) {
+			e.preventDefault();
+			form.classList.add('was-validated');
+			const firstInvalid = form.querySelector(':invalid');
+			if (firstInvalid) {
+				const sec = firstInvalid.closest('.section-card');
+				if (sec) sec.classList.remove('collapsed');
+				firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}
+		}
+	});
+	</script>
+
+</body>
+</html>

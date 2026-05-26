@@ -1,0 +1,225 @@
+.card-data {
+	font-weight: bolder;
+	font-size: 2em;
+	font-style: italic;
+}
+
+#header {
+	margin-bottom: 50px;
+}
+
+#layoutSidenav_content {
+	margin-top: 82px;
+}
+
+.input-group>.select2-container--bootstrap {
+	width: auto;
+	flex: 1 1 auto;
+}
+
+.input-group>.select2-container--bootstrap .select2-selection--single {
+	height: 100%;
+	line-height: inherit;
+	padding: 0.5rem 1rem;
+	border: 1px solid #ced4da;
+	padding: 0.375rem 2.25rem 0.375rem 0.75rem;
+	-moz-padding-start: calc(0.75rem - 3px);
+	font-size: 1rem;
+	font-weight: 400;
+	line-height: 1.5;
+}
+
+.select2-container--bootstrap .select2-selection--single .select2-selection__placeholder
+	{
+	color: #999;
+}
+
+.select2-container--bootstrap .select2-results>.select2-results__options
+	{
+	max-height: 200px;
+	overflow-y: auto;
+}
+
+.select2-container--bootstrap .select2-results__option--highlighted[aria-selected]
+	{
+	background-color: #5897fb;
+	color: white;
+}
+
+.info-box {
+	display: block;
+	min-height: 90px;
+	background: #fff;
+	width: 100%;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+	border-radius: 2px;
+	margin-bottom: 15px;
+	border: 2px solid #ccc;
+}
+
+.bg-green, .callout.callout-success, .alert-success, .label-success,
+	.modal-success .modal-body {
+	background-color: #00a65a !important;
+}
+
+.info-box-content {
+	padding: 5px 10px;
+	margin-left: 90px;
+}
+
+.info-box-text {
+	text-transform: uppercase;
+}
+
+.progress-description, .info-box-text {
+	display: block;
+	font-size: 14px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.info-box-number {
+	display: block;
+	font-weight: bold;
+	font-size: 18px;
+}
+
+.nav-menu-header {
+	box-shadow: 1px 2px 2px rgb(50, 50, 220), 0 2px 4px rgb(10, 10, 200);
+}
+
+.menu-selected {
+	font-weight: bold;
+	background-color: #C4F4FB !important;
+}
+
+.bg_accepted {
+	background-color: #D5F5E3 !important;
+}
+
+.bg_delivered {
+	background-color: #85C1E9 !important;
+}
+
+.bg_nonconform {
+	background-color: #E74C3C !important;
+}
+
+.bg_result_available {
+	background-color: #82E0AA !important;
+}
+
+.bg_result_collected {
+	background-color: #3498DB !important;
+}
+
+.bg_result_on_site {
+	background-color: #28B463 !important;
+}
+
+.bg_analysis_failed {
+	background-color: #a51d2d !important;
+}
+
+.bg_on_transit {
+	background-color: #ffbe6f ! important;
+}
+
+.nav-menu-header .navbar-brand {
+	font-weight: 600;
+	letter-spacing: .3px;
+}
+
+.appVersion {
+	font-size: .85rem;
+	color: #6c757d;
+	font-style: italic;
+	font-weight: bold;
+}
+
+footer a {
+	text-decoration: none;
+}
+
+footer a:hover {
+	text-decoration: underline;
+}
+
+.filter-card {
+	border: 1px solid #e6e9f3;
+	border-radius: 1rem;
+}
+
+.filter-card .card-header {
+	background: #f8fafc;
+	border-bottom: 1px solid #e6e9f3;
+}
+
+.select2-container .select2-selection--single {
+	height: calc(1.5em + .5rem + 2px) !important;
+	/* aligne avec .form-select-sm */
+	border-radius: .25rem !important;
+	border-color: #ced4da !important;
+}
+
+.select2-selection__rendered {
+	line-height: 1.5 !important;
+	font-size: .875rem;
+}
+
+.select2-selection__arrow {
+	height: calc(1.5em + .5rem) !important;
+}
+
+.select2-container--default .select2-selection--single {
+	border: 1px solid #ced4da !important;
+	border-radius: .25rem !important;
+	height: calc(1.5em + .5rem + 2px) !important;
+	padding: .25rem .5rem;
+	background-color: #fff;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered
+	{
+	line-height: 1.5 !important;
+	font-size: .875rem;
+	color: #212529;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow
+	{
+	height: 100% !important;
+}
+
+/* Corrige les bordures manquantes des champs Select2 */
+.select2-container--default .select2-selection--single {
+	border: 1px solid #ced4da !important; /* Bordure gris Bootstrap */
+	border-radius: 0.25rem !important; /* Coins arrondis */
+	background-color: #fff !important;
+	height: calc(1.5em + 0.75rem + 2px) !important;
+	/* Hauteur alignée aux .form-control-sm */
+	display: flex !important;
+	align-items: center !important;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered
+	{
+	padding-left: 0.5rem !important;
+	padding-right: 1.5rem !important;
+	line-height: 1.5 !important;
+	font-size: 0.875rem !important;
+	color: #212529 !important;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow
+	{
+	top: 50% !important;
+	right: 0.5rem !important;
+	transform: translateY(-50%) !important;
+	position: absolute !important;
+}
+
+.form-select+.select2 .select2-selection--single {
+	border: 1px solid #ced4da !important;
+}

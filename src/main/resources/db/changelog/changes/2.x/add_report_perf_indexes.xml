@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd
+    http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+	<!--
+		Index de perf pour les requêtes /report et /dashboard.
+
+		Le fix du bug "rejetés sans réceptionnés" déplace tous les filtres
+		des compteurs sur les COLONNES DE DATES PERSISTANTES de la table
+		sample (deliver_at_*_date, accepted_at_*_date, rejection_date,
+		analysis_*_date, result_*_date). Sans index sur ces colonnes,
+		chaque agrégat scanne toute la table → rapports lents dès 5k–10k
+		samples.
+
+		Tous les changeSets sont idempotents (préconditions indexExists).
+	-->
+
+	<changeSet id="add-index-sample-deliver-at-lab-date" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_deliver_at_lab_date" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_deliver_at_lab_date" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="deliver_at_lab_date" />
+		</createIndex>
+	</changeSet>
+
+	<changeSet id="add-index-sample-deliver-at-hub-date" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_deliver_at_hub_date" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_deliver_at_hub_date" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="deliver_at_hub_date" />
+		</createIndex>
+	</changeSet>
+
+	<changeSet id="add-index-sample-accepted-at-lab-date" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_accepted_at_lab_date" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_accepted_at_lab_date" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="accepted_at_lab_date" />
+		</createIndex>
+	</changeSet>
+
+	<changeSet id="add-index-sample-accepted-at-hub-date" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_accepted_at_hub_date" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_accepted_at_hub_date" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="accepted_at_hub_date" />
+		</createIndex>
+	</changeSet>
+
+	<changeSet id="add-index-sample-rejection-date" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_rejection_date" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_rejection_date" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="rejection_date" />
+		</createIndex>
+	</changeSet>
+
+	<changeSet id="add-index-sample-analysis-completed-date" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_analysis_completed_date" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_analysis_completed_date" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="analysis_completed_date" />
+		</createIndex>
+	</changeSet>
+
+	<changeSet id="add-index-sample-analysis-released-date" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_analysis_released_date" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_analysis_released_date" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="analysis_released_date" />
+		</createIndex>
+	</changeSet>
+
+	<changeSet id="add-index-sample-result-collection-date" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_result_collection_date" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_result_collection_date" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="result_collection_date" />
+		</createIndex>
+	</changeSet>
+
+	<changeSet id="add-index-sample-result-delivery-date" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_result_delivery_date" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_result_delivery_date" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="result_delivery_date" />
+		</createIndex>
+	</changeSet>
+
+</databaseChangeLog>

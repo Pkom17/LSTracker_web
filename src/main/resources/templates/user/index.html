@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:th="http://www.thymeleaf.org"
+	xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity6">
+
+<head th:replace="~{fragments/header :: head}">
+<title>Gestion des utilisateurs</title>
+</head>
+
+<body class="sb-nav-fixed">
+
+<style>
+.users-layout {
+	display: grid;
+	grid-template-columns: 300px 1fr;
+	gap: 1rem;
+	align-items: start;
+}
+@media (max-width: 992px) {
+	.users-layout { grid-template-columns: 1fr; }
+	.users-sidebar { position: static !important; max-height: none !important; }
+}
+
+.users-sidebar {
+	position: sticky;
+	top: 70px;
+	max-height: calc(100vh - 90px);
+	overflow-y: auto;
+	border: 1px solid #e6e9f3;
+	border-radius: .75rem;
+	background: #fff;
+}
+.users-sidebar .sidebar-header {
+	background: #f8fafc;
+	border-bottom: 1px solid #e6e9f3;
+	padding: .75rem 1rem;
+	border-radius: .75rem .75rem 0 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+.users-sidebar .sidebar-body { padding: 1rem; }
+.users-sidebar .filter-group { margin-bottom: 1rem; }
+.users-sidebar .filter-group > label.form-label {
+	font-size: .72rem;
+	text-transform: uppercase;
+	font-weight: 600;
+	color: #6b7280;
+	letter-spacing: .03em;
+	margin-bottom: .35rem;
+}
+
+.toggle-row {
+	display: flex; align-items: center; justify-content: space-between;
+	padding: .3rem 0;
+}
+.toggle-row span { font-size: .85rem; color: #374151; }
+
+.users-toolbar {
+	display: flex; gap: .5rem; flex-wrap: wrap; align-items: stretch;
+	margin-bottom: .5rem; padding: .5rem .75rem;
+	border: 1px solid #e6e9f3; border-radius: .5rem; background: #fff;
+}
+.users-toolbar > .toolbar-item { display: flex; align-items: center; }
+.search-input { max-width: 320px; flex: 1 1 220px; }
+.search-input .form-control-sm { height: calc(1.5em + .5rem + 2px); }
+
+.input-icon { position: relative; }
+.input-icon i { position: absolute; left: .55rem; top: 50%; transform: translateY(-50%); color: #9ca3af; }
+.input-icon input { padding-left: 1.75rem; }
+
+/* Badges */
+.badge-status {
+	display: inline-block;
+	font-size: .7rem;
+	font-weight: 600;
+	padding: .15rem .55rem;
+	border-radius: 1rem;
+	white-space: nowrap;
+}
+.b-active { background: #e9f7ef; color: #167b3a; }
+.b-inactive { background: #f3f4f6; color: #6b7280; }
+.b-locked { background: #fde2e1; color: #9b1c1c; }
+
+/* Role pill */
+.role-pill {
+	display: inline-block;
+	font-size: .7rem;
+	font-weight: 600;
+	padding: .15rem .55rem;
+	border-radius: .25rem;
+	background: #eef2ff;
+	color: #3730a3;
+}
+
+/* Row actions */
+.row-actions { display: flex; gap: .15rem; }
+.row-actions .btn-action {
+	border: 1px solid #d1d5db;
+	background: #fff;
+	color: #374151;
+	font-size: .8rem;
+	padding: .15rem .45rem;
+	border-radius: .25rem;
+	cursor: pointer;
+	line-height: 1;
+}
+.row-actions .btn-action:hover { background: #f3f4f6; }
+.row-actions .btn-action.btn-danger-soft { color: #dc2626; }
+.row-actions .btn-action.btn-warning-soft { color: #b45309; }
+.row-actions .btn-action.btn-success-soft { color: #16a34a; }
+.row-actions .btn-action.btn-info-soft { color: #0ea5e9; }
+
+/* DataTables tweaks */
+table#tab_users thead th {
+	background: #f8fafc;
+	border-bottom: 2px solid #e6e9f3;
+	font-size: .8rem;
+	white-space: nowrap;
+}
+table#tab_users tbody td {
+	vertical-align: middle;
+	font-size: .85rem;
+}
+table#tab_users tbody tr:hover { background: #fafcff; }
+
+.empty-cell { color: #9ca3af; font-style: italic; }
+</style>
+
+	<div class="d-flex" id="wrapper">
+		<div id="page-content-wrapper">
+
+			<div th:insert="~{fragments/header :: header(content='Gestion des utilisateurs', module='user')}"></div>
+
+			<div class="container-fluid py-3">
+
+				<div class="users-layout">
+
+					<!-- ============ SIDEBAR FILTRES ============ -->
+					<aside class="users-sidebar">
+						<div class="sidebar-header">
+							<div class="d-flex align-items-center gap-2">
+								<i class="fas fa-filter text-primary"></i>
+								<strong>Filtres</strong>
+							</div>
+							<button class="btn btn-sm btn-link p-0 text-decoration-none" id="btnResetAll" type="button" title="Tout effacer">
+								<i class="fas fa-times-circle"></i> Effacer
+							</button>
+						</div>
+
+						<div class="sidebar-body">
+
+							<!-- Recherche -->
+							<div class="filter-group">
+								<label class="form-label" for="searchText">Recherche</label>
+								<div class="input-icon">
+									<i class="fas fa-search"></i>
+									<input type="search" id="searchText" class="form-control form-control-sm"
+										placeholder="login, nom, contact..." autocomplete="off"/>
+								</div>
+							</div>
+
+							<!-- Rôle (multi) -->
+							<div class="filter-group">
+								<label class="form-label" for="filter_role">Rôles (multi)</label>
+								<select class="form-select form-select-sm select2-multi" id="filter_role" multiple>
+									<option th:each="r : ${userRoles}" th:value="${r.role}" th:text="${r.role}"></option>
+								</select>
+							</div>
+
+							<!-- Zones géographiques -->
+							<div class="filter-group">
+								<label class="form-label" for="filter_region">Région</label>
+								<select class="form-select form-select-sm select2-single" id="filter_region">
+									<option value=""></option>
+									<option th:each="r : ${regions}" th:value="${r.id}" th:text="${r.name}"></option>
+								</select>
+							</div>
+							<div class="filter-group">
+								<label class="form-label" for="filter_district">District</label>
+								<select class="form-select form-select-sm select2-single" id="filter_district">
+									<option value=""></option>
+									<option th:each="d : ${districts}" th:value="${d.id}" th:text="${d.name}"></option>
+								</select>
+							</div>
+							<div class="filter-group">
+								<label class="form-label" for="filter_lab">Laboratoire</label>
+								<select class="form-select form-select-sm select2-single" id="filter_lab">
+									<option value=""></option>
+									<option th:each="l : ${labs}" th:value="${l.id}" th:text="${l.name}"></option>
+								</select>
+							</div>
+
+							<!-- Toggles statut -->
+							<div class="filter-group">
+								<label class="form-label">Statut du compte</label>
+								<div class="toggle-row">
+									<span><i class="fas fa-check-circle text-success me-1"></i>Actifs uniquement</span>
+									<div class="form-check form-switch">
+										<input class="form-check-input" type="checkbox" id="toggleActive"/>
+									</div>
+								</div>
+								<div class="toggle-row">
+									<span><i class="fas fa-times-circle text-secondary me-1"></i>Inactifs uniquement</span>
+									<div class="form-check form-switch">
+										<input class="form-check-input" type="checkbox" id="toggleInactive"/>
+									</div>
+								</div>
+								<div class="toggle-row">
+									<span><i class="fas fa-lock text-danger me-1"></i>Verrouillés uniquement</span>
+									<div class="form-check form-switch">
+										<input class="form-check-input" type="checkbox" id="toggleLocked"/>
+									</div>
+								</div>
+							</div>
+
+						</div>
+					</aside>
+
+					<!-- ============ MAIN ============ -->
+					<main>
+
+						<div class="users-toolbar">
+							<div class="toolbar-item input-icon search-input">
+								<i class="fas fa-search"></i>
+								<input type="search" id="quickSearch" class="form-control form-control-sm"
+									placeholder="Recherche rapide..." autocomplete="off"/>
+							</div>
+
+							<div class="toolbar-item ms-auto gap-2">
+								<a class="btn btn-sm btn-primary" th:href="@{/appuser/new}">
+									<i class="fas fa-user-plus me-1"></i> Nouvel utilisateur
+								</a>
+								<button class="btn btn-sm btn-outline-secondary" id="btnReload" type="button" title="Rafraîchir">
+									<i class="fas fa-sync"></i>
+								</button>
+							</div>
+						</div>
+
+						<div class="card shadow-sm">
+							<div class="card-body p-2">
+								<table id="tab_users" class="table table-sm table-hover table-striped align-middle" style="width:100%">
+									<thead>
+										<tr>
+											<th style="width:50px;">#</th>
+											<th data-col="login">Identifiant</th>
+											<th data-col="full_name">Nom complet</th>
+											<th data-col="phone">Contact</th>
+											<th data-col="role">Rôle</th>
+											<th data-col="user_type">Type</th>
+											<th data-col="user_level">Niveau</th>
+											<th data-col="status">Statut</th>
+											<th data-col="last_login">Dernière connexion</th>
+											<th data-col="actions">Actions</th>
+										</tr>
+									</thead>
+								</table>
+							</div>
+						</div>
+
+					</main>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- ============ MODAL : Reset password result ============ -->
+	<div class="modal fade" id="resetPwdModal" tabindex="-1" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title"><i class="fas fa-key text-warning"></i> Mot de passe réinitialisé</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+				</div>
+				<div class="modal-body">
+					<p class="small text-muted">Le mot de passe a été régénéré. Communiquez-le à l'utilisateur par un canal sécurisé. <strong>Il devra le changer à la prochaine connexion.</strong></p>
+					<div class="mb-2"><strong>Utilisateur :</strong> <span id="rpLogin">—</span></div>
+					<div class="input-group">
+						<input type="text" id="rpPassword" class="form-control font-monospace" readonly/>
+						<button class="btn btn-outline-secondary" type="button" onclick="copyResetPwd()">
+							<i class="fas fa-copy"></i> Copier
+						</button>
+					</div>
+					<div class="alert alert-warning small mt-3 mb-0">
+						<i class="fas fa-exclamation-triangle"></i> Ce mot de passe ne sera plus visible après fermeture de cette fenêtre.
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fermer</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<footer class="py-4 bg-light mt-auto" th:insert="~{fragments/footer :: footer}"></footer>
+
+	<script th:src="@{/webjars/jquery/3.6.0/jquery.min.js}"></script>
+	<script th:src="@{/webjars/jquery-ui/1.13.2/jquery-ui.min.js}"></script>
+	<script th:src="@{/webjars/bootstrap/5.1.3/js/bootstrap.bundle.min.js}"></script>
+	<script th:src="@{/webjars/font-awesome/5.15.4/js/all.js}"></script>
+	<script th:src="@{/webjars/select2/4.0.13/js/select2.min.js}"></script>
+	<script th:src="@{/DataTables/datatables.min.js}"></script>
+
+	<script th:inline="none">
+	/* eslint-disable */
+	$(function () {
+		$('.select2-single').select2({ width: '100%', allowClear: true, placeholder: '— Tous —' });
+		$('.select2-multi').select2({ width: '100%', allowClear: true, placeholder: '— Sélectionner —' });
+
+		// Mutually exclusive Active/Inactive toggles
+		$('#toggleActive').on('change', function() {
+			if (this.checked) $('#toggleInactive').prop('checked', false);
+			reload();
+		});
+		$('#toggleInactive').on('change', function() {
+			if (this.checked) $('#toggleActive').prop('checked', false);
+			reload();
+		});
+
+		const table = $('#tab_users').DataTable({
+			processing: true,
+			serverSide: true,
+			ordering: false,
+			ajax: {
+				url: 'appuser/data',
+				data: function(d) {
+					d.search_text = $('#searchText').val() || $('#quickSearch').val() || null;
+					const roles = $('#filter_role').val() || [];
+					if (roles.length) d.role = roles;
+					d.region = $('#filter_region').val() || null;
+					d.district = $('#filter_district').val() || null;
+					d.lab = $('#filter_lab').val() || null;
+					if ($('#toggleActive').is(':checked')) d.active = true;
+					else if ($('#toggleInactive').is(':checked')) d.active = false;
+					if ($('#toggleLocked').is(':checked')) d.locked = true;
+				},
+				dataSrc: 'data',
+				traditional: true
+			},
+			columns: [
+				{
+					data: null, orderable: false, searchable: false,
+					className: 'text-center text-muted',
+					render: function (data, type, row, meta) {
+						return meta.row + meta.settings._iDisplayStart + 1;
+					}
+				},
+				{ data: 'login' },
+				{ data: null, render: renderFullName },
+				{ data: 'phone_contact', render: renderText },
+				{ data: 'role', render: renderRole },
+				{ data: 'user_type', render: renderText },
+				{ data: 'user_level', render: renderText },
+				{ data: null, render: renderStatus },
+				{ data: 'last_login', render: renderDateTime },
+				{ data: 'id', render: renderActions, orderable: false }
+			],
+			pageLength: 25,
+			lengthMenu: [10, 25, 50, 100, 200],
+			dom: '<"row align-items-center mb-2"<"col-md-6"l><"col-md-6 text-end"i>>rtp',
+			language: {
+				processing: '<i class="fas fa-spinner fa-spin"></i> Chargement...',
+				lengthMenu: 'Afficher _MENU_',
+				info: '_START_–_END_ sur _TOTAL_',
+				infoEmpty: 'Aucun utilisateur',
+				zeroRecords: 'Aucun utilisateur trouvé',
+				emptyTable: 'Aucun utilisateur',
+				paginate: { first: '«', last: '»', next: '›', previous: '‹' }
+			}
+		});
+
+		function reload() { table.ajax.reload(); }
+		window.reloadUsers = reload;
+
+		const debouncedReload = debounce(reload, 300);
+		$('#filter_role, #filter_region, #filter_district, #filter_lab, #toggleLocked').on('change', reload);
+		$('#searchText, #quickSearch').on('input', debouncedReload);
+		$('#btnReload').on('click', reload);
+		$('#btnResetAll').on('click', function() {
+			$('#searchText, #quickSearch').val('');
+			$('#filter_role, #filter_region, #filter_district, #filter_lab').val(null).trigger('change.select2');
+			$('#toggleActive, #toggleInactive, #toggleLocked').prop('checked', false);
+			reload();
+		});
+	});
+
+	function renderFullName(data, type, row) {
+		const ln = row.last_name || '';
+		const fn = row.first_name || '';
+		const full = (ln + ' ' + fn).trim();
+		return full ? escapeHtml(full) : '<span class="empty-cell">—</span>';
+	}
+	function renderText(data) {
+		return data ? escapeHtml(data) : '<span class="empty-cell">—</span>';
+	}
+	function renderRole(data) {
+		return data ? '<span class="role-pill">' + escapeHtml(data) + '</span>' : '<span class="empty-cell">—</span>';
+	}
+	function renderDateTime(data) {
+		if (!data) return '<span class="empty-cell">jamais</span>';
+		const d = new Date(data);
+		if (isNaN(d)) return data;
+		const pad = n => String(n).padStart(2, '0');
+		return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear()
+			+ ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+	}
+	function renderStatus(data, type, row) {
+		let html = '';
+		if (row.is_active) html += '<span class="badge-status b-active"><i class="fas fa-check-circle"></i> Actif</span> ';
+		else html += '<span class="badge-status b-inactive"><i class="fas fa-times-circle"></i> Inactif</span> ';
+		if (row.is_locked) html += '<span class="badge-status b-locked"><i class="fas fa-lock"></i> Verrouillé</span>';
+		return html;
+	}
+	function renderActions(data, type, row) {
+		const id = row.id;
+		const isActive = row.is_active;
+		const isLocked = row.is_locked;
+		return ''
+			+ '<div class="row-actions">'
+			+   '<a class="btn-action btn-warning-soft" title="Modifier" href="appuser/update/' + id + '"><i class="fas fa-pencil-alt"></i></a>'
+			+   '<a class="btn-action btn-info-soft" title="Affecter zones" href="appuser/edit_org/' + id + '"><i class="fas fa-hospital-user"></i></a>'
+			+   '<button class="btn-action ' + (isActive ? 'btn-danger-soft' : 'btn-success-soft') + '" '
+			+         'title="' + (isActive ? 'Désactiver' : 'Activer') + '" onclick="toggleActive(' + id + ',' + isActive + ')">'
+			+     '<i class="fas fa-' + (isActive ? 'user-slash' : 'user-check') + '"></i></button>'
+			+   '<button class="btn-action ' + (isLocked ? 'btn-success-soft' : 'btn-warning-soft') + '" '
+			+         'title="' + (isLocked ? 'Déverrouiller' : 'Verrouiller') + '" onclick="toggleLock(' + id + ',' + isLocked + ')">'
+			+     '<i class="fas fa-' + (isLocked ? 'unlock' : 'lock') + '"></i></button>'
+			+   '<button class="btn-action btn-warning-soft" title="Réinitialiser mot de passe" onclick="resetPassword(' + id + ')">'
+			+     '<i class="fas fa-key"></i></button>'
+			+ '</div>';
+	}
+
+	function toggleActive(id, currentlyActive) {
+		const msg = currentlyActive
+			? 'Désactiver cet utilisateur ? Ses sessions actives seront fermées.'
+			: 'Réactiver cet utilisateur ?';
+		if (!confirm(msg)) return;
+		$.post('appuser/' + id + '/toggle-active')
+			.done(() => window.reloadUsers())
+			.fail(() => alert("Erreur lors de l'opération"));
+	}
+	function toggleLock(id, currentlyLocked) {
+		const msg = currentlyLocked
+			? 'Déverrouiller cet utilisateur ?'
+			: 'Verrouiller cet utilisateur ? Ses sessions actives seront fermées.';
+		if (!confirm(msg)) return;
+		$.post('appuser/' + id + '/toggle-lock')
+			.done(() => window.reloadUsers())
+			.fail(() => alert("Erreur lors de l'opération"));
+	}
+	function resetPassword(id) {
+		if (!confirm('Réinitialiser le mot de passe ? Un nouveau mot de passe temporaire sera généré et toutes ses sessions seront fermées.')) return;
+		$.post('appuser/' + id + '/reset-password')
+			.done(function(data) {
+				$('#rpLogin').text(data.login || '—');
+				$('#rpPassword').val(data.temporaryPassword || '');
+				const modal = new bootstrap.Modal(document.getElementById('resetPwdModal'));
+				modal.show();
+				window.reloadUsers();
+			})
+			.fail(() => alert("Erreur lors de la réinitialisation"));
+	}
+	function copyResetPwd() {
+		const input = document.getElementById('rpPassword');
+		input.select();
+		try { document.execCommand('copy'); } catch (e) {}
+		if (navigator.clipboard) navigator.clipboard.writeText(input.value).catch(() => {});
+	}
+
+	function debounce(fn, ms) {
+		let t;
+		return function() {
+			const args = arguments, ctx = this;
+			clearTimeout(t);
+			t = setTimeout(() => fn.apply(ctx, args), ms);
+		};
+	}
+	function escapeHtml(str) {
+		if (str == null) return '';
+		return String(str).replace(/[&<>"']/g, function(c) {
+			return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+		});
+	}
+	</script>
+
+</body>
+</html>

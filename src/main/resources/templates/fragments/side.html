@@ -1,0 +1,39 @@
+<!DOCTYPE HTML>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:th="http://www.thymeleaf.org"
+	xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity5">
+
+<head th:replace="~{fragments/header :: head}">
+</head>
+
+<body>
+	<div id="layoutSidenav" th:fragment="side"
+		sec:authorize="isAuthenticated()">
+		<div class="border-end bg-white" id="sidebar-wrapper">
+			<div class="sidebar-heading border-bottom bg-light">Menu</div>
+			<div class="list-group list-group-flush">
+				<a
+					class="list-group-item list-group-item-action list-group-item-light p-3"
+					th:href="@{/}">Accueil</a> <a
+					class="list-group-item list-group-item-action list-group-item-light p-3"
+					th:href="@{/eorder}">Demandes électroniques</a> <a
+					class="list-group-item list-group-item-action list-group-item-light p-3"
+					th:href="@{/analysis}">Demandes d'analyses reçues</a> <a
+					sec:authorize="hasAnyRole('ADMIN')"
+					class="list-group-item list-group-item-action list-group-item-light p-3"
+					th:href="@{/platform}">Plateformes</a> <a
+					sec:authorize="hasRole('ADMIN')"
+					class="list-group-item list-group-item-action list-group-item-light p-3"
+					th:href="@{/user}">Utilisateurs</a>
+			</div>
+		</div>
+	</div>
+	<script th:src="@{/webjars/jquery/3.6.0/jquery.min.js}"></script>
+	<script th:src="@{/webjars/bootstrap/5.1.3/js/bootstrap.bundle.min.js}"></script>
+	<script th:src="@{/webjars/font-awesome/5.15.4/js/all.js}"></script>
+	<script th:src="@{/DataTables/datatables.min.js}"></script>
+	<script th:src="@{/js/scripts.js}"></script>
+
+</body>
+
+</html>

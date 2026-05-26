@@ -1,0 +1,1028 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.5.xsd
+						http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+	<changeSet id="24032901" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="region">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="name" type="varchar(100)">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+	<changeSet id="24032902" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="district">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="name" type="varchar(100)">
+				<constraints nullable="false" />
+			</column>
+			<column name="region_id" type="int">
+				<constraints nullable="true"
+					foreignKeyName="fk_district_region_1" referencedColumnNames="id"
+					referencedTableName="region"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+		</createTable>
+	</changeSet>
+	<changeSet id="24032903" author="pkomena">
+		<createTable schemaName="sample_tracker" tableName="site">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="name" type="varchar(200)">
+				<constraints nullable="false" />
+			</column>
+			<column name="dhis_code" type="varchar(10)">
+				<constraints nullable="false" />
+			</column>
+			<column name="datim_code" type="varchar(20)">
+				<constraints nullable="true" />
+			</column>
+			<column name="district_id" type="int">
+				<constraints nullable="true"
+					foreignKeyName="fk_site_district_1" referencedTableName="district"
+					referencedColumnNames="id"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="longitude" type="float">
+				<constraints nullable="true" />
+			</column>
+			<column name="latitude" type="float">
+				<constraints nullable="true" />
+			</column>
+			<column name="last_updated_at" type="datetime">
+				<constraints nullable="true" />
+			</column>
+		</createTable>
+	</changeSet>
+	<changeSet id="24032904" author="pkomena">
+		<loadData file="db/changelog/changes/csv/regions.csv"
+			tableName="region" schemaName="sample_tracker">
+		</loadData>
+	</changeSet>
+	<changeSet id="24032905" author="pkomena">
+		<loadData file="db/changelog/changes/csv/districts.csv"
+			tableName="district" schemaName="sample_tracker">
+		</loadData>
+	</changeSet>
+
+	<changeSet id="24032906" author="pkomena">
+		<preConditions>
+			<not>
+				<tableExists tableName="app_user"
+					schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createTable tableName="app_user"
+			schemaName="sample_tracker">
+			<column name="id" autoIncrement="true" type="int">
+				<constraints primaryKey="true"
+					primaryKeyName="pk_app_user" />
+			</column>
+			<column name="login" type="varchar(255)">
+				<constraints nullable="false" unique="true"
+					uniqueConstraintName="un_user_login" />
+			</column>
+			<column name="password" type="varchar(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="password_reset" type="boolean"
+				defaultValue="true">
+				<constraints nullable="true" />
+			</column>
+			<column name="is_active" type="boolean" defaultValue="true">
+				<constraints nullable="false" />
+			</column>
+			<column name="is_locked" type="boolean" defaultValue="false">
+				<constraints nullable="false" />
+			</column>
+			<column name="first_name" type="varchar(100)">
+				<constraints nullable="true" />
+			</column>
+			<column name="last_name" type="varchar(100)">
+				<constraints nullable="true" />
+			</column>
+			<column name="phone_contact" type="varchar(45)">
+				<constraints nullable="false" unique="true"
+					uniqueConstraintName="un_user_phone" />
+			</column>
+			<column name="last_login" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="password_expire_at" type="date">
+				<constraints nullable="true" />
+			</column>
+			<column name="created_at" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="created_by" type="int">
+				<constraints nullable="true" />
+			</column>
+			<column name="last_updated_at" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="last_updated_by" type="int">
+				<constraints nullable="true" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24032908" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="app_role">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="name" type="varchar(100)">
+				<constraints nullable="false" />
+			</column>
+			<column name="is_active" type="boolean" defaultValue="true">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet author="pkomena" id="240323101">
+		<preConditions onError="CONTINUE">
+			<tableExists tableName="app_role"
+				schemaName="sample_tracker" />
+		</preConditions>
+		<sql>
+			insert into sample_tracker.app_role(id,name) values
+			(1,'ADMIN'),(2,'USER'),(3,'APP_USER');
+		</sql>
+	</changeSet>
+
+	<changeSet author="pkomena" id="24032907">
+		<insert tableName="app_user" schemaName="sample_tracker">
+			<column name="login" value="admin" />
+			<column name="password"
+				value="$2a$12$U57nXcUCTlVdy//996d2duIQgBg8OtjdoopgcWLJmR4TKhv1Zaigu" /> <!-- Admin_24! -->
+			<column name="phone_contact" value="+2250101010101" />
+			<column name="password_reset" value="false" />
+			<column name="is_locked" value="false" />
+			<column name="last_name" value="Admin" />
+			<column name="first_name" value="Admin" />
+			<column name="created_at" defaultValueComputed="now()" />
+			<column name="password_expire_at" value="2050-12-31" />
+		</insert>
+	</changeSet>
+
+
+	<changeSet id="24032909" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="app_user_has_role">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="app_role_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_app_role_1" referencedColumnNames="id"
+					referencedTableName="app_role"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="app_user_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_app_user_1" referencedColumnNames="id"
+					referencedTableName="app_user"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="is_active" type="boolean" defaultValue="true">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+	<changeSet author="pkomena" id="240323102">
+		<insert tableName="app_user_has_role"
+			schemaName="sample_tracker">
+			<column name="app_role_id"
+				valueComputed="(SELECT id FROM sample_tracker.app_role WHERE name='ADMIN')" />
+			<column name="app_user_id"
+				valueComputed="(SELECT id FROM sample_tracker.app_user WHERE login='admin')" />
+		</insert>
+	</changeSet>
+
+	<changeSet id="24032921" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="circuit">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="circuit_number" type="varchar(100)"></column>
+			<column name="created_at" defaultValueComputed="now()"
+				type="datetime" />
+			<column name="is_active" type="boolean" defaultValue="true">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+	<changeSet id="24032922" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="circuit_site">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="circuit_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_circuit_site_app_circuit_1"
+					referencedColumnNames="id" referencedTableName="circuit"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="site_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_ride_circuit_site_1" referencedColumnNames="id"
+					referencedTableName="site"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="created_at" defaultValueComputed="now()"
+				type="datetime" />
+			<column name="is_active" type="boolean" defaultValue="true">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24032910" author="pkomena">
+		<createTable schemaName="sample_tracker" tableName="ride">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="app_user_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_ride_app_user_1" referencedColumnNames="id"
+					referencedTableName="app_user"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="circuit_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_ride_circuit_1" referencedColumnNames="id"
+					referencedTableName="circuit"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="ride_number" type="varchar(100)"></column>
+			<column name="start_date" type="datetime">
+				<constraints nullable="false" />
+			</column>
+			<column name="end_date" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="start_mileage" type="int">
+				<constraints nullable="true" />
+			</column>
+			<column name="end_mileage" type="int">
+				<constraints nullable="true" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24032911" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="sample_retrieving">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="ride_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_sample_collection_ride_1"
+					referencedColumnNames="id" referencedTableName="ride"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="site_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_sample_collection_site_1"
+					referencedColumnNames="id" referencedTableName="site"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="sample_retrieve_date" type="date">
+				<constraints nullable="false" />
+			</column>
+			<column name="sample_retrieve_time" type="time">
+				<constraints nullable="false" />
+			</column>
+			<column name="entered_date" type="datetime">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24032912" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="sample_package">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="package_number" type="varchar(100)">
+				<constraints nullable="false" />
+			</column>
+			<column name="created_at" type="datetime">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+
+
+	<changeSet id="24032913" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="sample_status">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="status" type="varchar(50)">
+				<constraints nullable="false" />
+			</column>
+			<column name="description" type="varchar(100)">
+				<constraints nullable="true" />
+			</column>
+			<column name="created_at" type="datetime">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24032914" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="sample_type">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="name" type="varchar(50)">
+				<constraints nullable="false" />
+			</column>
+			<column name="description" type="varchar(100)">
+				<constraints nullable="true" />
+			</column>
+			<column name="created_at" type="datetime">
+				<constraints nullable="false" />
+			</column>
+			<column name="is_active" type="boolean" defaultValue="true">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24032915" author="pkomena">
+		<createTable schemaName="sample_tracker" tableName="lab">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="lab_name" type="varchar(100)">
+				<constraints nullable="false" />
+			</column>
+			<column name="lab_phone" type="varchar(50)">
+				<constraints nullable="true" />
+			</column>
+			<column name="lab_mail" type="varchar(50)">
+				<constraints nullable="true" />
+			</column>
+			<column name="lab_type" type="varchar(100)">
+				<constraints nullable="false" />
+			</column>
+			<column name="district_id" type="int">
+				<constraints nullable="true"
+					foreignKeyName="fk_lab_district_1" referencedTableName="district"
+					referencedColumnNames="id"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="longitude" type="float">
+				<constraints nullable="true" />
+			</column>
+			<column name="latitude" type="float">
+				<constraints nullable="true" />
+			</column>
+			<column name="created_at" type="datetime">
+				<constraints nullable="false" />
+			</column>
+			<column name="is_active" type="boolean" defaultValue="true">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24032916" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="sample">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="sample_type_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_sample_sample_type_1" referencedColumnNames="id"
+					referencedTableName="sample_type"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="sample_status_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_sample_sample_status_1"
+					referencedColumnNames="id" referencedTableName="sample_status"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="sample_package_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_sample_sample_package_1"
+					referencedColumnNames="id" referencedTableName="sample_package"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="sample_retrieving_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_sample_sample_retrieving_1"
+					referencedColumnNames="id" referencedTableName="sample_retrieving"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="sample_identifier" type="varchar(50)">
+				<constraints nullable="true" />
+			</column>
+			<column name="patient_identifier" type="varchar(50)">
+				<constraints nullable="false" />
+			</column>
+			<column name="collection_date" type="date">
+				<constraints nullable="false" />
+			</column>
+			<column name="collection_time" type="time">
+				<constraints nullable="false" />
+			</column>
+			<column name="lab_number" type="varchar(100)">
+				<constraints nullable="true" />
+			</column>
+			<column name="created_at" type="datetime">
+				<constraints nullable="false" />
+			</column>
+			<column name="lastupdated_at" type="datetime">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24032917" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="sample_at_lab">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="sample_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_sample_at_lab_sample_1"
+					referencedColumnNames="id" referencedTableName="sample"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="sample_status_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_sample_sample_status_1"
+					referencedColumnNames="id" referencedTableName="sample_status"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="lab_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_sample_lab_1" referencedColumnNames="id"
+					referencedTableName="lab"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="lab_number" type="varchar(100)">
+				<constraints nullable="true" />
+			</column>
+			<column name="received_date" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="started_date" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="completed_date" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="released_date" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="result_collect_date" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="created_at" type="datetime">
+				<constraints nullable="false" />
+			</column>
+			<column name="lastupdated_at" type="datetime">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24032918" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="tracking_event">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="sample_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_tracking_event_sample_1"
+					referencedColumnNames="id" referencedTableName="sample"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="longitude" type="float">
+				<constraints nullable="true" />
+			</column>
+			<column name="latitude" type="float">
+				<constraints nullable="true" />
+			</column>
+			<column name="created_at" type="datetime">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24032919" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="sample_rejection_type">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="rejection_type" type="varchar(255)">
+				<constraints nullable="false" />
+			</column>
+			<column name="created_at" type="datetime">
+				<constraints nullable="false" />
+			</column>
+			<column name="is_active" type="boolean" defaultValue="true">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+	<changeSet id="24032920" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="sample_rejection">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="sample_rejection_type_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_sample_rejection_type_sample_rejection_1"
+					referencedColumnNames="id"
+					referencedTableName="sample_rejection_type"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="comment" type="varchar(255)">
+				<constraints nullable="true" />
+			</column>
+			<column name="created_at" type="datetime">
+				<constraints nullable="false" />
+			</column>
+			<column name="is_active" type="boolean" defaultValue="true">
+				<constraints nullable="false" />
+			</column>
+		</createTable>
+	</changeSet>
+	<changeSet id="24040301" author="pkomena">
+		<addColumn tableName="app_user" schemaName="sample_tracker">
+			<column type="varchar(45)" name="role">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+		<update tableName="app_user" schemaName="sample_tracker">
+			<column name="role" type="varchar(45)" value="SUPER_ADMIN">
+			</column>
+			<where> login='admin'</where>
+		</update>
+	</changeSet>
+
+	<changeSet id="24040302" author="pkomena">
+		<addNotNullConstraint tableName="app_user"
+			schemaName="sample_tracker" columnName="role"
+			columnDataType="varchar(45)"></addNotNullConstraint>
+	</changeSet>
+
+	<changeSet id="24040303" author="pkomena">
+		<addColumn tableName="app_user" schemaName="sample_tracker">
+			<column type="varchar(100)" name="user_type">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+		<update tableName="app_user" schemaName="sample_tracker">
+			<column name="user_type" type="varchar(100)" value="AUTRE">
+			</column>
+			<where> login='admin'</where>
+		</update>
+	</changeSet>
+
+	<changeSet id="24040401" author="pkomena">
+		<addColumn tableName="sample_rejection"
+			schemaName="sample_tracker">
+			<column name="sample_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="sample_rejection_sample_id"
+					referencedTableSchemaName="sample_tracker"
+					referencedTableName="sample" referencedColumnNames="id" />
+			</column>
+		</addColumn>
+	</changeSet>
+	<changeSet id="24040402" author="pkomena">
+		<dropColumn tableName="sample_rejection"
+			schemaName="sample_tracker">
+			<column name="is_active" type="boolean"></column>
+		</dropColumn>
+	</changeSet>
+
+	<changeSet id="24040901" author="pkomena">
+		<addColumn tableName="app_user" schemaName="sample_tracker">
+			<column type="varchar(100)" name="user_level">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="24041001" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="app_user_has_region">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="region_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_app_user_has_region_region_1"
+					referencedColumnNames="id" referencedTableName="region"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="app_user_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_app_user_has_region_app_user_1"
+					referencedColumnNames="id" referencedTableName="app_user"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24041002" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="app_user_has_district">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="district_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_app_user_has_district_district_1"
+					referencedColumnNames="id" referencedTableName="district"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="app_user_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_app_user_has_district_app_user_1"
+					referencedColumnNames="id" referencedTableName="app_user"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24041003" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="app_user_has_site">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="site_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_app_user_has_site_site_1"
+					referencedColumnNames="id" referencedTableName="site"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="app_user_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_app_user_has_site_app_user_1"
+					referencedColumnNames="id" referencedTableName="app_user"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24041004" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="app_user_has_circuit">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="circuit_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_app_user_has_circuit_circuit_1"
+					referencedColumnNames="id" referencedTableName="circuit"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="app_user_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_app_user_has_circuit_app_user_1"
+					referencedColumnNames="id" referencedTableName="app_user"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24041005" author="pkomena">
+		<createTable schemaName="sample_tracker"
+			tableName="app_user_has_lab">
+			<column name="id" type="int" autoIncrement="true">
+				<constraints primaryKey="true" />
+			</column>
+			<column name="lab_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_app_user_has_lab_lab_1"
+					referencedColumnNames="id" referencedTableName="lab"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="app_user_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_app_user_has_lab_app_user_1"
+					referencedColumnNames="id" referencedTableName="app_user"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+		</createTable>
+	</changeSet>
+
+	<changeSet id="24041301" author="pkomena">
+		<preConditions onError="CONTINUE" onFail="CONTINUE">
+			<sqlCheck expectedResult="0">
+				select count(*) from
+				sample_tracker.sample_status where status = 'ON_TRANSIT';
+			</sqlCheck>
+		</preConditions>
+		<sqlFile path="../sql/sample_status.sql"
+			relativeToChangelogFile="true" />
+	</changeSet>
+
+	<changeSet id="24041302" author="pkomena">
+		<preConditions onError="CONTINUE" onFail="CONTINUE">
+			<sqlCheck expectedResult="0">
+				select count(*) from
+				sample_tracker.sample_type where name = 'BI';
+			</sqlCheck>
+		</preConditions>
+		<sqlFile path="../sql/sample_type.sql"
+			relativeToChangelogFile="true" />
+	</changeSet>
+
+	<changeSet id="24041303" author="pkomena">
+		<addColumn tableName="sample" schemaName="sample_tracker">
+			<column type="varchar(100)" name="sample_number">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="24041304" author="pkomena">
+		<dropColumn tableName="sample_retrieving"
+			schemaName="sample_tracker">
+			<column type="time" name="sample_retrieve_time">
+			</column>
+		</dropColumn>
+	</changeSet>
+	<changeSet id="24041305" author="pkomena">
+		<modifyDataType schemaName="sample_tracker"
+			tableName="sample_retrieving" columnName="sample_retrieve_date"
+			newDataType="datetime" />
+	</changeSet>
+
+	<changeSet id="24041306" author="pkomena">
+		<dropColumn tableName="sample" schemaName="sample_tracker">
+			<column type="time" name="collection_time">
+			</column>
+		</dropColumn>
+	</changeSet>
+	<changeSet id="24041307" author="pkomena">
+		<modifyDataType schemaName="sample_tracker"
+			tableName="sample" columnName="collection_date"
+			newDataType="datetime" />
+	</changeSet>
+
+	<changeSet id="24041401" author="pkomena">
+		<dropNotNullConstraint
+			tableName="sample_retrieving" columnName="ride_id"
+			schemaName="sample_tracker" columnDataType="int" />
+		<addColumn schemaName="sample_tracker"
+			tableName="sample_retrieving">
+			<column name="app_user_id" type="int">
+				<constraints nullable="false"
+					foreignKeyName="fk_sample_retrieving_app_user_1"
+					referencedColumnNames="id" referencedTableName="app_user"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="24041402" author="pkomena">
+		<addColumn schemaName="sample_tracker"
+			tableName="tracking_event">
+			<column name="mileage" type="int">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+		<addColumn schemaName="sample_tracker"
+			tableName="tracking_event">
+			<column name="org_id" type="int">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+		<addColumn schemaName="sample_tracker"
+			tableName="tracking_event">
+			<column name="org_type" type="varchar(50)">
+				<constraints nullable="true" />
+			</column>
+			<column name="event_type" type="varchar(50)">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="24041403" author="pkomena">
+		<dropColumn tableName="sample_at_lab"
+			schemaName="sample_tracker">
+			<column type="int" name="sample_status_id">
+			</column>
+		</dropColumn>
+	</changeSet>
+
+	<changeSet id="24041404" author="pkomena">
+		<preConditions onError="CONTINUE" onFail="CONTINUE">
+			<sqlCheck expectedResult="0">
+				select count(*) from
+				sample_tracker.sample_rejection_type where rejection_type =
+				'Autres';
+			</sqlCheck>
+		</preConditions>
+		<sqlFile path="../sql/sample_rejection_type.sql"
+			relativeToChangelogFile="true" />
+
+	</changeSet>
+
+	<changeSet id="24041405" author="pkomena">
+		<addColumn schemaName="sample_tracker" tableName="sample">
+			<column name="deliver_at_hub_date" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="deliver_at_lab_date" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="accepted_at_hub_date" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="accepted_at_lab_date" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="result_collection_date" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="result_delivery_date" type="datetime">
+				<constraints nullable="true" />
+			</column>
+			<column name="hub_id" type="int">
+				<constraints nullable="true"
+					foreignKeyName="fk_sample_lab_2" referencedColumnNames="id"
+					referencedTableName="lab"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+			<column name="reference_lab_id" type="int">
+				<constraints nullable="true"
+					foreignKeyName="fk_sample_lab_3" referencedColumnNames="id"
+					referencedTableName="lab"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="24041406" author="pkomena">
+		<addColumn schemaName="sample_tracker"
+			tableName="tracking_event">
+			<column name="app_user_id" type="int">
+				<constraints nullable="true"
+					foreignKeyName="fk_tracking_event_app_user_1"
+					referencedColumnNames="id" referencedTableName="app_user"
+					referencedTableSchemaName="sample_tracker" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="24041501" author="pkomena">
+		<dropNotNullConstraint tableName="sample"
+			columnName="sample_package_id" schemaName="sample_tracker"
+			columnDataType="int" />
+	</changeSet>
+	<changeSet id="24041502" author="pkomena">
+		<sqlFile path="../sql/date_calendar.sql"
+			relativeToChangelogFile="true" />
+	</changeSet>
+
+	<changeSet id="24041601" author="pkomena">
+		<addUniqueConstraint columnNames="lab_name"
+			tableName="lab" schemaName="sample_tracker" />
+		<addUniqueConstraint columnNames="circuit_number"
+			tableName="circuit" schemaName="sample_tracker" />
+		<addUniqueConstraint columnNames="name"
+			tableName="site" schemaName="sample_tracker" />
+	</changeSet>
+
+	<changeSet id="24041901" author="pkomena">
+		<addUniqueConstraint
+			columnNames="site_id,circuit_id" tableName="circuit_site"
+			schemaName="sample_tracker" />
+	</changeSet>
+
+	<changeSet id="24042401" author="pkomena">
+		<addColumn tableName="sample" schemaName="sample_tracker">
+			<column type="int" name="destination_lab_id">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="24042601" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<foreignKeyConstraintExists
+				foreignKeyName="fk_tracking_event_sample_1" />
+		</preConditions>
+		<dropForeignKeyConstraint
+			baseTableName="tracking_event" baseTableSchemaName="sample_tracker"
+			constraintName="fk_tracking_event_sample_1" />
+		<addForeignKeyConstraint
+			baseTableName="tracking_event" baseTableSchemaName="sample_tracker"
+			baseColumnNames="sample_id"
+			constraintName="fk_tracking_event_sample_1"
+			referencedTableName="sample"
+			referencedTableSchemaName="sample_tracker" referencedColumnNames="id"
+			onDelete="CASCADE" />
+	</changeSet>
+
+	<changeSet id="24050201" author="pkomena">
+		<addColumn tableName="sample" schemaName="sample_tracker">
+			<column type="datetime" name="analysis_completed_date">
+				<constraints nullable="true" />
+			</column>
+			<column type="datetime" name="analysis_released_date">
+				<constraints nullable="true" />
+			</column>
+			<column type="datetime" name="result_reported_date">
+				<constraints nullable="true" />
+			</column>
+			<column type="varchar(200)" name="requester_site_name">
+				<constraints nullable="true" />
+			</column>
+			<column type="varchar(200)" name="destination_lab_name">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="24050301" author="pkomena">
+		<addColumn tableName="sample" schemaName="sample_tracker">
+			<column type="datetime" name="rejection_date">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="24050501" author="pkomena">
+		<createIndex indexName="idx_sample_status_status"
+			tableName="sample_status" unique="false" schemaName="sample_tracker">
+			<column name="status" />
+		</createIndex>
+	</changeSet>
+
+	<changeSet id="24050502" author="pkomena">
+		<createIndex indexName="idx_tracking_event_event_type"
+			tableName="tracking_event" unique="false" schemaName="sample_tracker">
+			<column name="event_type" />
+		</createIndex>
+	</changeSet>
+	<changeSet id="24050503" author="pkomena">
+		<dropNotNullConstraint
+			tableName="sample_rejection" columnName="sample_rejection_type_id"
+			schemaName="sample_tracker" columnDataType="int" />
+	</changeSet>
+	<!-- add mileage to sample -->
+
+	<changeSet id="24050701" author="pkomena">
+		<addColumn schemaName="sample_tracker" tableName="sample">
+			<column name="collection_start_mileage" type="int">
+				<constraints nullable="true" />
+			</column>
+			<column name="collection_end_mileage" type="int">
+				<constraints nullable="true" />
+			</column>
+			<column name="result_start_mileage" type="int">
+				<constraints nullable="true" />
+			</column>
+			<column name="result_end_mileage" type="int">
+				<constraints nullable="true" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<changeSet id="24050801" author="pkomena">
+		<dropColumn tableName="sample" schemaName="sample_tracker">
+			<column type="varchar(100)" name="sample_number">
+			</column>
+		</dropColumn>
+	</changeSet>
+
+</databaseChangeLog>

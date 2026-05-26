@@ -1,0 +1,10 @@
+<a
+  th:fragment="paging(pageNum, label, tooltip)"
+  class="page-link"
+  th:onclick="|setPage(${pageNum}); return false;|"
+  href=""
+  th:title="${tooltip}"
+  rel="tooltip"
+>
+  [[${label}]]
+</a>

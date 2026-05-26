@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd
+    http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+	<!-- Optimistic locking via JPA @Version (préparation détection de conflits sync) -->
+	<changeSet id="add-version-column-to-sample" author="pkomena">
+		<addColumn tableName="sample" schemaName="sample_tracker">
+			<column name="version" type="BIGINT" defaultValueNumeric="0">
+				<constraints nullable="false" />
+			</column>
+		</addColumn>
+	</changeSet>
+
+	<!-- Index pour la résolution rapide par UUID (sync mobile push/pull) -->
+	<changeSet id="add-index-sample-uuid" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_uuid" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_uuid" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="uuid" />
+		</createIndex>
+	</changeSet>
+
+	<!-- Index sur lastupdated_at pour le pull incrémental (since=...) -->
+	<changeSet id="add-index-sample-lastupdated-at" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_lastupdated_at" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_lastupdated_at" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="lastupdated_at" />
+		</createIndex>
+	</changeSet>
+
+	<!-- Index composé pour filtre statut + type (listes très fréquentes) -->
+	<changeSet id="add-index-sample-status-type" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_status_type" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_status_type" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="sample_status_id" />
+			<column name="sample_type_id" />
+		</createIndex>
+	</changeSet>
+
+	<!-- Index sur requester_site_id (dashboard/report par site) -->
+	<changeSet id="add-index-sample-requester-site-id" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_requester_site_id" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_requester_site_id" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="requester_site_id" />
+		</createIndex>
+	</changeSet>
+
+	<!-- Index sur destination_lab_id (filtrage laboratoire) -->
+	<changeSet id="add-index-sample-destination-lab-id" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_destination_lab_id" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_destination_lab_id" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="destination_lab_id" />
+		</createIndex>
+	</changeSet>
+
+	<!-- Index sur reference_lab_id (lab assigné après acceptation) -->
+	<changeSet id="add-index-sample-reference-lab-id" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_reference_lab_id" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_reference_lab_id" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="reference_lab_id" />
+		</createIndex>
+	</changeSet>
+
+	<!-- Index sur collection_date (filtres dashboard par période) -->
+	<changeSet id="add-index-sample-collection-date" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_collection_date" tableName="sample" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_collection_date" tableName="sample"
+			unique="false" schemaName="sample_tracker">
+			<column name="collection_date" />
+		</createIndex>
+	</changeSet>
+
+	<!-- Index sur tracking_event.sample_id (relation lazy / audit trail) -->
+	<changeSet id="add-index-tracking-event-sample-id" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_tracking_event_sample_id" tableName="tracking_event" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_tracking_event_sample_id" tableName="tracking_event"
+			unique="false" schemaName="sample_tracker">
+			<column name="sample_id" />
+		</createIndex>
+	</changeSet>
+
+	<!-- Index sur sample_at_lab.sample_id (relation lazy) -->
+	<changeSet id="add-index-sample-at-lab-sample-id" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_at_lab_sample_id" tableName="sample_at_lab" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_at_lab_sample_id" tableName="sample_at_lab"
+			unique="false" schemaName="sample_tracker">
+			<column name="sample_id" />
+		</createIndex>
+	</changeSet>
+
+	<!-- Index sur sample_rejection.sample_id (lookup fréquent dans sync) -->
+	<changeSet id="add-index-sample-rejection-sample-id" author="pkomena">
+		<preConditions onFail="MARK_RAN">
+			<not>
+				<indexExists indexName="idx_sample_rejection_sample_id" tableName="sample_rejection" schemaName="sample_tracker" />
+			</not>
+		</preConditions>
+		<createIndex indexName="idx_sample_rejection_sample_id" tableName="sample_rejection"
+			unique="false" schemaName="sample_tracker">
+			<column name="sample_id" />
+		</createIndex>
+	</changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,53 @@
+<!DOCTYPE HTML>
+<html lang="fr" xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:th="http://www.thymeleaf.org">
+<body>
+	<footer class="mt-auto site-footer" th:fragment="footer">
+		<div class="container py-3">
+			<div class="row align-items-center gy-2">
+				<!-- Copyright + organisation -->
+				<div class="col-12 col-md text-center text-md-start small text-muted">
+					<i class="fas fa-copyright"></i>
+					I-TECH CIV
+					<span th:text="${#dates.format(#dates.createNow(), 'yyyy')}">2026</span>
+					&nbsp;&middot;&nbsp;
+					<span class="text-nowrap">Tous droits réservés</span>
+				</div>
+
+				<!-- Liens légaux -->
+				<div class="col-12 col-md text-center">
+					<a class="small text-muted mx-2 footer-link" th:href="@{/legal/privacy}" target="_blank">
+						<i class="fas fa-shield-alt"></i> Confidentialité
+					</a>
+					<span class="text-muted">&middot;</span>
+					<a class="small text-muted mx-2 footer-link" th:href="@{/legal/terms}" target="_blank">
+						<i class="fas fa-file-contract"></i> CGU
+					</a>
+				</div>
+
+				<!-- Version applicative -->
+				<div class="col-12 col-md text-center text-md-end small text-muted">
+					<span class="version-badge">
+						<i class="fas fa-code-branch"></i>
+						LS Tracker v<span th:text="${appVersion}">2.0.0</span>
+					</span>
+				</div>
+			</div>
+		</div>
+
+		<style>
+			.site-footer { background:#f8fafc; border-top:1px solid #e6e9f3; }
+			.footer-link { transition: color .15s ease; text-decoration:none; }
+			.footer-link:hover { color:#233B8B !important; text-decoration:underline; }
+			.footer-link i { margin-right:.25rem; opacity:.7; }
+			.version-badge {
+				display:inline-flex; align-items:center; gap:.35rem;
+				padding:.15rem .55rem;
+				background:#fff; border:1px solid #e6e9f3; border-radius:1rem;
+				font-size:.72rem; color:#4b5563;
+			}
+			.version-badge i { color:#233B8B; }
+		</style>
+	</footer>
+</body>
+</html>

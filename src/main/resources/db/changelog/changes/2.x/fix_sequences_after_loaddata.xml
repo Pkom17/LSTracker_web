@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+
+	<!--
+		Recale les séquences PostgreSQL pour les tables `region` et `district`.
+
+		Contexte : init_db.xml charge ces deux tables via <loadData> à partir
+		de CSV qui contiennent un id explicite. Ce chargement ne fait PAS
+		avancer la séquence implicite (region_id_seq, district_id_seq) qui
+		reste à 1. Conséquence : le premier INSERT applicatif via JPA
+		(GenerationType.IDENTITY) reçoit id=1, déjà présent → contrainte
+		PK violée :
+		   ERROR: duplicate key value violates unique constraint "region_pkey"
+
+		Fix : on positionne la séquence à MAX(id) + 1 sur chaque table. Si
+		la table est vide (improbable mais possible), on garde la valeur 1.
+
+		Idempotent : `setval` est sans effet de bord si on l'applique
+		plusieurs fois, mais Liquibase ne rejouera pas le changeSet
+		(checksum). Une `precondition` empêche aussi le rejeu si jamais
+		on duplique l'include.
+	-->
+
+	<changeSet id="fix-region-sequence" author="pkomena">
+		<preConditions onFail="MARK_RAN" onFailMessage="region table missing or sequence already aligned">
+			<tableExists tableName="region" schemaName="sample_tracker"/>
+		</preConditions>
+		<sql dbms="postgresql">
+			SELECT setval(
+				pg_get_serial_sequence('sample_tracker.region', 'id'),
+				COALESCE((SELECT MAX(id) FROM sample_tracker.region), 0) + 1,
+				false
+			);
+		</sql>
+	</changeSet>
+
+	<changeSet id="fix-district-sequence" author="pkomena">
+		<preConditions onFail="MARK_RAN" onFailMessage="district table missing or sequence already aligned">
+			<tableExists tableName="district" schemaName="sample_tracker"/>
+		</preConditions>
+		<sql dbms="postgresql">
+			SELECT setval(
+				pg_get_serial_sequence('sample_tracker.district', 'id'),
+				COALESCE((SELECT MAX(id) FROM sample_tracker.district), 0) + 1,
+				false
+			);
+		</sql>
+	</changeSet>
+
+</databaseChangeLog>

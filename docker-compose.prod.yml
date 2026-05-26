@@ -1,0 +1,124 @@
+# =====================================================================
+# LSTracker — déploiement PRODUCTION
+# Lit les secrets depuis .env.prod (ne JAMAIS commit ce fichier).
+# Lance : docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+# =====================================================================
+
+name: lst_prod
+
+networks:
+  lst_prod_net:
+    driver: bridge
+
+volumes:
+  trackerdb_prod:
+
+services:
+
+  # -------------------------------------------------------------------
+  # PostgreSQL 14 — production
+  # Mémoire : 18 GiB (limit) / 10 GiB (reservation)
+  # CPU     : 6 cores (limit)
+  # Tuning  : monté via postgresql.prod.conf (cf. config/postgres/).
+  # -------------------------------------------------------------------
+  tracker_db:
+    image: postgres:14
+    container_name: lst_prod_db
+    restart: unless-stopped
+    networks:
+      - lst_prod_net
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${TZ:-Africa/Abidjan}
+    volumes:
+      - trackerdb_prod:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/01_init_db.sql:ro
+      - ./config/postgres/postgresql.prod.conf:/etc/postgresql/postgresql.conf:ro
+    command:
+      - "postgres"
+      - "-c"
+      - "config_file=/etc/postgresql/postgresql.conf"
+    ports:
+      # Exposé uniquement sur 127.0.0.1 pour tunnel SSH / backup local.
+      # Pas d'exposition publique de Postgres.
+      - "127.0.0.1:5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "6"
+          memory: 18G
+        reservations:
+          cpus: "1.5"
+          memory: 10G
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # -------------------------------------------------------------------
+  # App Spring Boot — production
+  # Mémoire : 18 GiB (limit) / 12 GiB (reservation)
+  #   La JVM utilisera ~75% de la limit (cf. -XX:MaxRAMPercentage=75)
+  #   soit ~13.5 GiB de heap max.
+  # CPU     : 7 cores (limit)
+  # Image   : pull depuis ghcr.io (tag fourni dans .env.prod).
+  # -------------------------------------------------------------------
+  tracker_app:
+    image: ${APP_IMAGE:-ghcr.io/itech-ci/labsampletracker:latest}
+    container_name: lst_prod_app
+    restart: unless-stopped
+    networks:
+      - lst_prod_net
+    depends_on:
+      tracker_db:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Africa/Abidjan}
+      SERVER_PORT: 9200
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tracker_db:5432/${POSTGRES_DB}?currentSchema=sample_tracker
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_POOL_MAX: ${DB_POOL_MAX:-50}
+      DB_POOL_MIN: ${DB_POOL_MIN:-10}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-43200}
+      JWT_REFRESH_TTL_DAYS: ${JWT_REFRESH_TTL_DAYS:-60}
+      # Tuning JVM : MaxRAMPercentage respecte la limite du conteneur.
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp"
+    ports:
+      # Port public PROD : 9200 (mappé sur le port interne 9200).
+      # Si Nginx/Traefik en frontal, bind sur 127.0.0.1 pour cacher l'app.
+      - "${PROD_PORT:-9200}:9200"
+    volumes:
+      # Persiste les logs hors conteneur pour rotation/analyse externe.
+      - ./logs/prod:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "7"
+          memory: 18G
+        reservations:
+          cpus: "1.5"
+          memory: 12G
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "10"
