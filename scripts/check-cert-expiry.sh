@@ -18,10 +18,17 @@ set -euo pipefail
 THRESHOLD_DAYS="${THRESHOLD_DAYS:-30}"
 ALERT_EMAIL="${ALERT_EMAIL:-}"
 
-CERTS=(
-  "/etc/ssl/lstracker/lstracker.org.fullchain.pem"
-  "/etc/ssl/itech-civ/wildcard.itech-civ.org.fullchain.pem"
+# Seul le cert wildcard itech-civ est local (le cert lstracker.org est géré par
+# le fournisseur de domaine via CDN externe — pas de fichier sur ce serveur).
+# Override possible via env: CERTS="/path/to/cert1.pem /path/to/cert2.pem"
+DEFAULT_CERTS=(
+  "/home/itech/ssl/itech-civ.org/fullchain.pem"
 )
+if [[ -n "${CERTS_OVERRIDE:-}" ]]; then
+  read -r -a CERTS <<< "$CERTS_OVERRIDE"
+else
+  CERTS=("${DEFAULT_CERTS[@]}")
+fi
 
 NOW_EPOCH=$(date +%s)
 WARNINGS=()

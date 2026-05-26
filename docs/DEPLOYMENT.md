@@ -227,9 +227,9 @@ Résumé pour la DEMO :
 ```bash
 # 1. DNS : créer A record lstracker-demo.itech-civ.org → IP serveur
 
-# 2. Placer le cert wildcard *.itech-civ.org sur le serveur
-sudo mkdir -p /etc/ssl/itech-civ
-# (uploader wildcard.itech-civ.org.fullchain.pem et .key)
+# 2. Vérifier que le cert wildcard *.itech-civ.org est en place
+ls -la /home/itech/ssl/itech-civ.org/
+# fullchain.pem + privkey.pem attendus (sinon adapter les noms dans le vhost)
 
 # 3. Déployer le vhost demo
 sudo cp config/nginx/lstracker-demo.conf /etc/nginx/sites-available/
@@ -237,8 +237,8 @@ sudo ln -sf /etc/nginx/sites-available/lstracker-demo.conf /etc/nginx/sites-enab
 sudo nginx -t && sudo systemctl reload nginx
 
 # 4. Tester
-curl -fsS https://lstracker-demo.itech-civ.org/actuator/health   # doit retourner 403 (bloqué public)
-curl -fsS https://lstracker-demo.itech-civ.org/                  # doit charger la page login
+curl -fsS https://lstracker-demo.itech-civ.org/actuator/health   # 403 attendu
+curl -fsS https://lstracker-demo.itech-civ.org/                  # page login
 ```
 
 ---
@@ -355,26 +355,26 @@ docker ps --filter "name=lst_"
 # Doit montrer : lst_demo_app, lst_demo_db, lst_prod_app, lst_prod_db
 ```
 
-### 3.4 Configurer nginx pour exposer la PROD en HTTPS
+### 3.4 Configurer nginx pour exposer la PROD
 
 > Voir **[NGINX.md](NGINX.md)** pour le détail, en particulier la section [Migration apache2 → nginx](NGINX.md#migration-apache2--nginx) si apache2 servait déjà la prod.
+>
+> Rappel : le TLS de `lstracker.org` est géré par le fournisseur de domaine (CDN externe). nginx écoute en HTTP, aucun cert à placer sur le serveur pour la prod.
 
 ```bash
-# 1. Placer le cert lstracker.org sur le serveur (cf. NGINX.md §Prérequis)
-sudo mkdir -p /etc/ssl/lstracker
-# (uploader lstracker.org.fullchain.pem et .key, permissions 644/600)
-
-# 2. Déployer le vhost prod
+# 1. Déployer le vhost prod (HTTP only — pas de cert à configurer)
 sudo cp config/nginx/lstracker-prod.conf /etc/nginx/sites-available/
-# Adapter les chemins des certs dans /etc/nginx/sites-available/lstracker-prod.conf
 sudo ln -sf /etc/nginx/sites-available/lstracker-prod.conf /etc/nginx/sites-enabled/
 
-# 3. Test syntaxe + reload
+# 2. Test syntaxe + reload
 sudo nginx -t && sudo systemctl reload nginx
 
-# 4. Tester
+# 3. Tester depuis le serveur (HTTP local, comme le CDN nous appelle)
+curl -fsS -H "Host: lstracker.org" http://127.0.0.1/
+
+# 4. Tester depuis l'extérieur (via le CDN)
 curl -fsS https://lstracker.org/
-curl -sI -k https://lstracker.org/actuator/health   # doit être 403 publiquement
+curl -sI https://lstracker.org/actuator/health   # 403 attendu (bloqué publiquement)
 ```
 
 ### 3.5 Importer les données de production (si migration depuis ancien serveur)
