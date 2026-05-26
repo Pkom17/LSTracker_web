@@ -2,7 +2,17 @@
 
 Application web et backend pour le suivi des échantillons médicaux en transport entre sites de collecte et laboratoires d'analyse (PNLS / PNLT / PNLP — Côte d'Ivoire).
 
-Stack : **Spring Boot 3.2** · **Java 17** · **PostgreSQL 14** · **Thymeleaf** · **JasperReports**. App mobile compagnon : [LSTracker Mobile](../TransportDNO/) (Flutter).
+Stack : **Spring Boot 3.2** · **Java 17** · **PostgreSQL 14** · **Thymeleaf** · **JasperReports**. App mobile compagnon : [LSTracker Mobile](https://github.com/ITECH-CI/LSTracker_mobile) (Flutter).
+
+---
+
+## Documentation détaillée
+
+| Document | Quand le lire |
+|---|---|
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Runbook complet de déploiement initial (DEMO puis PROD) |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Procédures d'opérations courantes (backups, updates, rotation secrets, monitoring, troubleshooting) |
+| [scripts/](scripts/) | Scripts d'automatisation : `backup-db.sh`, `restore-db.sh`, `rotate-secrets.sh` |
 
 ---
 
