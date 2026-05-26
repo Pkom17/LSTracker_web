@@ -18,7 +18,6 @@ RUN mvn -B -q dependency:go-offline
 # Couche 2 : code source (invalidée à chaque modif source mais les deps
 # restent en cache).
 COPY src ./src
-COPY TelosysTools ./TelosysTools
 
 # Build : skip les tests (lance-les en CI séparément si besoin).
 RUN mvn -B -q clean package -DskipTests \
