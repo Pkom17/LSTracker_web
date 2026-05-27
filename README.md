@@ -144,7 +144,7 @@ L'image `ghcr.io/itech-ci/labsampletracker` est **publique** → `docker pull` n
 - **Pas de secrets en clair dans le code** — `application.properties` n'a aucun fallback de password ou JWT secret. L'app refuse de démarrer si `JWT_SECRET` n'est pas défini.
 - **Postgres en loopback** : les ports DB (5435/5436) bindent `127.0.0.1` uniquement.
 - **Actuator restreint** : `/actuator/health` accessible depuis l'host pour les healthchecks Docker, bloqué publiquement par nginx.
-- **JWT** : secret 256 bits minimum (généré via `openssl rand -hex 64`).
+- **JWT** : secret base64 (≥ 256 bits), généré via `openssl rand -base64 64 | tr -d '\n'`. **Format obligatoire** : base64 — `JwtService` utilise `Decoders.BASE64.decode()`.
 - **Rotation des secrets** : script `scripts/rotate-secrets.sh` avec rollback automatique.
 
 ---

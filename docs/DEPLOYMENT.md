@@ -121,7 +121,7 @@ cp .env.demo.example .env.demo
 
 # Générer les secrets (à copier dans .env.demo)
 echo "POSTGRES_PASSWORD=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
-echo "JWT_SECRET=$(openssl rand -hex 64)"
+echo "JWT_SECRET=$(openssl rand -base64 64 | tr -d '\n')"
 
 nano .env.demo
 # Remplacer toutes les valeurs CHANGE_ME_*
@@ -195,7 +195,7 @@ ss -tlnp | grep :5436
 
 # JWT secret n'est pas un fallback hardcodé
 docker exec lst_demo_app env | grep JWT_SECRET | wc -c
-# > 130 attendu (128 hex chars + "JWT_SECRET=")
+# ~ 100 attendu (88 base64 chars + "JWT_SECRET=")
 ```
 
 ### 2.3 Période d'observation
@@ -225,7 +225,7 @@ cp .env.prod.example .env.prod
 
 # Générer des secrets DIFFÉRENTS de la demo
 echo "POSTGRES_PASSWORD=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
-echo "JWT_SECRET=$(openssl rand -hex 64)"
+echo "JWT_SECRET=$(openssl rand -base64 64 | tr -d '\n')"
 
 nano .env.prod
 # Remplacer CHANGE_ME_*. IMPORTANT :

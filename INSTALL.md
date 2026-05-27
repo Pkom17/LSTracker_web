@@ -71,7 +71,7 @@ cp .env.demo.example .env.demo
 
 # Générer les secrets
 echo "POSTGRES_PASSWORD=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
-echo "JWT_SECRET=$(openssl rand -hex 64)"
+echo "JWT_SECRET=$(openssl rand -base64 64 | tr -d '\n')"
 
 # Éditer .env.demo et remplacer toutes les valeurs CHANGE_ME_*
 nano .env.demo

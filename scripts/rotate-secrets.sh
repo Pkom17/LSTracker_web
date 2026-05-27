@@ -14,7 +14,7 @@
 #
 # Effets:
 #   1. Backup .env.<env> dans .env.<env>.backup.<timestamp>
-#   2. Génère nouveau JWT_SECRET (openssl rand -hex 64)
+#   2. Génère nouveau JWT_SECRET (openssl rand -base64 64)
 #   3. Génère nouveau POSTGRES_PASSWORD (openssl rand, alphanumérique)
 #   4. ALTER USER dans Postgres avec le nouveau password
 #   5. Met à jour .env.<env>
@@ -94,7 +94,10 @@ cp "$ENV_FILE" "$BACKUP_FILE"
 echo "==> Backup created: $BACKUP_FILE"
 
 # ---------- Generate new values ----------
-NEW_JWT=$(openssl rand -hex 64)
+# JWT_SECRET doit être en base64 : JwtService utilise Decoders.BASE64.decode().
+# 64 bytes encodés en base64 = 88 caractères, soit ~512 bits effectifs.
+# tr -d '\n' : openssl ajoute des newlines à 76 chars qui casseraient le .env
+NEW_JWT=$(openssl rand -base64 64 | tr -d '\n')
 # Alphanumeric only — avoids issues with shell quoting and JDBC URL parsing
 NEW_DB_PWD=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)
 
