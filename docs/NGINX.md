@@ -48,7 +48,7 @@ dig +short lstracker-demo.itech-civ.org A
 # Tous doivent retourner l'IP du serveur
 ```
 
-### Cert wildcard *.itech-civ.org
+### Cert wildcard \*.itech-civ.org
 
 Le cert wildcard est dans `/home/itech/ssl/itech-civ.org/`. Vérifier les noms exacts :
 
@@ -63,12 +63,12 @@ Selon le CA, les noms et formats varient. **nginx exige 2 fichiers** :
 
 Cas courants reconnus par convention :
 
-| Tu as reçu | Format | Action |
-|---|---|---|
-| `fullchain.pem` + `privkey.pem` (Let's Encrypt) | PEM | ✅ Rien à faire |
-| `<domain>.crt` + `<domain>.ca-bundle` + `<domain>.key` (Sectigo, GoDaddy, etc.) | PEM avec extensions différentes | Construire le fullchain (voir ci-dessous) |
-| `cert.pem` + `intermediate.pem` + `key.pem` | PEM séparés | Construire le fullchain |
-| `<domain>.pfx` ou `<domain>.p12` | PKCS#12 (un seul fichier chiffré) | Extraire (voir ci-dessous) |
+| Tu as reçu                                                                      | Format                            | Action                                    |
+| ------------------------------------------------------------------------------- | --------------------------------- | ----------------------------------------- |
+| `fullchain.pem` + `privkey.pem` (Let's Encrypt)                                 | PEM                               | ✅ Rien à faire                           |
+| `<domain>.crt` + `<domain>.ca-bundle` + `<domain>.key` (Sectigo, GoDaddy, etc.) | PEM avec extensions différentes   | Construire le fullchain (voir ci-dessous) |
+| `cert.pem` + `intermediate.pem` + `key.pem`                                     | PEM séparés                       | Construire le fullchain                   |
+| `<domain>.pfx` ou `<domain>.p12`                                                | PKCS#12 (un seul fichier chiffré) | Extraire (voir ci-dessous)                |
 
 **Important** : `.crt`, `.cer`, `.pem` désignent souvent le **même format** (PEM, en base64 avec entêtes `-----BEGIN CERTIFICATE-----`). Vérifier avec :
 
@@ -221,6 +221,7 @@ sudo nginx -t && sudo systemctl reload nginx
 ### Cert lstracker.org
 
 **Rien à installer sur le serveur** — le TLS est géré par le CDN du fournisseur. Vérifier juste côté provider que :
+
 - L'origin (= ce serveur) est atteignable en HTTP sur le port 80
 - Le CDN envoie `X-Forwarded-Proto: https` (comportement par défaut)
 - Le CDN forward le header `Host: lstracker.org`
@@ -474,6 +475,7 @@ docker logs lst_prod_app --tail 50
 ```
 
 Causes typiques :
+
 - Container down → `docker compose up -d` depuis le bundle
 - Healthcheck encore en démarrage (60-90s après `up -d`) → attendre
 - Le port n'est pas en loopback (override `public.yml` actif par erreur) → recréer sans l'override
@@ -541,6 +543,7 @@ Doit montrer au moins 2 certificats (le tien + l'intermédiaire).
 ### Mixed content / URLs en `http://` au lieu de `https://`
 
 Causes :
+
 1. Spring ne fait pas confiance aux headers proxy → vérifier `server.forward-headers-strategy=NATIVE` dans `application.properties` (déjà configuré dans ce projet).
 2. Le CDN n'envoie pas `X-Forwarded-Proto: https` → vérifier la config CDN.
 3. nginx ne propage pas le header → vérifier la conf vhost prod.
