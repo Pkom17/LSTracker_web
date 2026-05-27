@@ -1,37 +1,20 @@
 # Reverse proxy nginx — LSTracker
 
-> Configuration nginx sur l'host (pas dans Docker) pour exposer la prod (`lstracker.org`) et la demo (`lstracker-demo.itech-civ.org`). Inclut la procédure de migration depuis apache2.
->
-> **Architectures TLS distinctes** :
-> - **PROD** : TLS terminé par un CDN/proxy externe (géré côté fournisseur de domaine). nginx reçoit du HTTP en clair sur le port 80.
-> - **DEMO** : TLS terminé localement par nginx (cert wildcard `*.itech-civ.org`).
+> nginx tourne **sur l'host** (pas Docker). Il expose la prod et la demo via les vhosts fournis dans le bundle (`config/nginx/`). Inclut la procédure de migration depuis apache2 sans interruption longue.
 
-## Sommaire
-
-1. [Architecture](#architecture)
-2. [Prérequis DNS et certificats](#prérequis-dns-et-certificats)
-3. [Migration apache2 → nginx](#migration-apache2--nginx)
-4. [Installation nginx from scratch](#installation-nginx-from-scratch)
-5. [Déploiement des vhosts](#déploiement-des-vhosts)
-6. [Tests et validation](#tests-et-validation)
-7. [Renouvellement des certificats](#renouvellement-des-certificats)
-8. [Troubleshooting](#troubleshooting)
-
----
-
-## Architecture
+## Architecture TLS
 
 ```
    ┌────────────────────────────────────┐    ┌────────────────────────┐
-   │  Client navigateur (lstracker.org) │    │ Client (demo.itech-civ)│
+   │  Client (lstracker.org)            │    │ Client (demo.itech-civ)│
    └────────┬───────────────────────────┘    └────────────┬───────────┘
             │ HTTPS                                       │ HTTPS direct
             ▼                                             │
    ┌──────────────────┐                                   │
-   │ CDN/proxy externe│   (TLS terminé ici)               │
+   │ CDN/proxy externe│  (TLS terminé par le fournisseur) │
    │ (fournisseur DNS)│                                   │
    └────────┬─────────┘                                   │
-            │ HTTP                                        │
+            │ HTTP (origin)                               │
             │ X-Forwarded-Proto: https                    │
             └──────────────────┬──────────────────────────┘
                                │
@@ -40,87 +23,47 @@
                        │  :80, :443   │  TLS terminé ici pour DEMO
                        └──┬────────┬──┘
                           │        │
-        ┌─────────────────┘        └────────────────────────┐
-        │ HTTP                                              │ HTTP
-  Host: lstracker.org                  Host: lstracker-demo.itech-civ.org
-   proxy_pass:                          proxy_pass:
-   127.0.0.1:9200                       127.0.0.1:9201
-        │                                                  │
-   ┌────▼──────┐                                    ┌──────▼─────┐
-   │ Docker    │                                    │ Docker     │
-   │ lst_prod_ │                                    │ lst_demo_  │
-   │  app      │                                    │  app       │
-   │  :9200    │                                    │  :9201     │
-   └───────────┘                                    └────────────┘
+                          │ HTTP   │ HTTP
+                          ▼        ▼
+                   127.0.0.1:9200  127.0.0.1:9201
+                   (lst_prod_app)  (lst_demo_app)
 ```
 
 **Points clés :**
 
-- nginx tourne **sur l'host** (apt install), pas dans Docker
-- Les containers Docker bindent leurs ports sur `127.0.0.1` uniquement → inaccessibles depuis l'extérieur sans passer par nginx
-- Le firewall ouvre seulement `:80` et `:443` (plus de `:9200`/`:9201` publics)
-- **PROD** : nginx reçoit du HTTP (TLS terminé par le CDN). Le header `X-Forwarded-Proto: https` est propagé tel quel à Spring → URLs générées correctement en https://
-- **DEMO** : nginx termine TLS lui-même avec le cert wildcard `*.itech-civ.org`
+- **PROD** (lstracker.org) : TLS géré par le CDN du fournisseur de domaine. nginx reçoit du HTTP sur :80. Le header `X-Forwarded-Proto: https` envoyé par le CDN est propagé tel quel à Spring → URLs générées en `https://`.
+- **DEMO** (lstracker-demo.itech-civ.org) : TLS terminé localement par nginx avec le cert wildcard `*.itech-civ.org`.
+- Les containers Docker bindent `127.0.0.1` → inaccessibles sans nginx (sauf override `docker-compose.demo.public.yml` pour la phase de validation).
 
 ---
 
-## Prérequis DNS et certificats
+## Prérequis
 
 ### DNS
-
-Avant de toucher au serveur, vérifier que les enregistrements DNS pointent vers l'IP du serveur :
 
 ```bash
 dig +short lstracker.org A
 dig +short www.lstracker.org A
 dig +short lstracker-demo.itech-civ.org A
-# Tous doivent retourner l'IP de ton serveur
+# Tous doivent retourner l'IP du serveur
 ```
 
-Si `lstracker-demo.itech-civ.org` n'existe pas encore : créer un enregistrement A chez le registrar/DNS d'ITECH-CI :
+### Cert wildcard *.itech-civ.org
 
-```
-Type: A
-Name: lstracker-demo
-Value: <IP du serveur>
-TTL : 3600
-```
-
-### Certificats SSL
-
-Deux situations distinctes :
-
-#### lstracker.org — pas de cert local
-
-Le TLS est géré par le **fournisseur de nom de domaine** (CDN/proxy en frontal). nginx écoute en HTTP seulement sur le port 80, le CDN se charge du HTTPS public.
-
-Rien à installer sur le serveur pour la prod. Le seul élément à vérifier côté provider :
-
-- L'origin (= ce serveur) est bien atteignable en HTTP sur le port 80
-- Le CDN envoie le header `X-Forwarded-Proto: https` quand le client est en HTTPS (comportement standard — nginx le propage à Spring)
-
-#### lstracker-demo.itech-civ.org — cert wildcard local
-
-Le cert wildcard `*.itech-civ.org` est stocké dans :
-
-```
-/home/itech/ssl/itech-civ.org/
-```
-
-Lister les fichiers réels :
+Le cert wildcard est dans `/home/itech/ssl/itech-civ.org/`. Vérifier les noms exacts :
 
 ```bash
 ls -la /home/itech/ssl/itech-civ.org/
 ```
 
-Les noms varient selon le CA / l'outil utilisé. Conventions courantes :
+Conventions :
 
-| Fichier attendu | Noms possibles |
+| Type | Noms possibles |
 |---|---|
-| Cert + chaîne | `fullchain.pem`, `<domain>.crt` + `chain.crt`, `cert.pem` + `intermediate.pem` |
-| Clé privée | `privkey.pem`, `<domain>.key`, `key.pem` |
+| Cert + chaîne | `fullchain.pem`, `<domain>.crt` + `chain.crt` |
+| Clé privée | `privkey.pem`, `<domain>.key` |
 
-Si tu as **cert + intermédiaire séparés**, construire le fullchain (nginx exige les deux concaténés) :
+Si cert + intermédiaire séparés → construire le fullchain :
 
 ```bash
 cat /home/itech/ssl/itech-civ.org/cert.crt \
@@ -128,92 +71,98 @@ cat /home/itech/ssl/itech-civ.org/cert.crt \
   | sudo tee /home/itech/ssl/itech-civ.org/fullchain.pem > /dev/null
 ```
 
-Permissions à appliquer **impérativement** :
+Permissions :
 
 ```bash
 sudo chmod 644 /home/itech/ssl/itech-civ.org/fullchain.pem
-sudo chmod 600 /home/itech/ssl/itech-civ.org/privkey.pem    # ou nom réel
+sudo chmod 600 /home/itech/ssl/itech-civ.org/privkey.pem
 ```
 
-Adapter ensuite les chemins dans `lstracker-demo.conf` si les noms diffèrent.
-
-Vérifier la validité :
+Vérifier validité :
 
 ```bash
 openssl x509 -noout -dates -subject -in /home/itech/ssl/itech-civ.org/fullchain.pem
-# notBefore=... notAfter=...
+# notAfter=...
 # subject=CN = *.itech-civ.org
 ```
+
+### Cert lstracker.org
+
+**Rien à installer sur le serveur** — le TLS est géré par le CDN du fournisseur. Vérifier juste côté provider que :
+- L'origin (= ce serveur) est atteignable en HTTP sur le port 80
+- Le CDN envoie `X-Forwarded-Proto: https` (comportement par défaut)
+- Le CDN forward le header `Host: lstracker.org`
 
 ---
 
 ## Migration apache2 → nginx
 
-À faire si apache2 sert déjà LSTracker en production. Procédure pour **basculer sans interruption longue** (downtime ~10 secondes).
+Pour basculer **sans interruption longue** (~10 secondes de downtime). À faire **après** validation de la demo sur port 9201.
 
-### 1. Préparer nginx (sans le démarrer)
+### 1. Installer nginx sans le démarrer
 
 ```bash
-# Installer nginx mais ne pas l'activer pour l'instant
 sudo apt update
 sudo apt install -y nginx
 
-# Empêcher nginx de démarrer automatiquement maintenant
+# Empêcher nginx de prendre les ports avant qu'on soit prêt
 sudo systemctl stop nginx
 sudo systemctl disable nginx
 ```
 
-À ce stade, apache2 continue de servir normalement.
+apache2 continue de servir normalement.
 
-### 2. Déployer les vhosts nginx
+### 2. Déployer les vhosts depuis le bundle
+
+Le bundle extrait contient `config/nginx/lstracker-{prod,demo}.conf`.
 
 ```bash
-cd /opt/lstracker
+cd /opt/lstracker/lstracker-deploy-2.2.0
+
+# Désactiver le vhost par défaut nginx
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# Copier les vhosts
 sudo cp config/nginx/lstracker-prod.conf /etc/nginx/sites-available/
 sudo cp config/nginx/lstracker-demo.conf /etc/nginx/sites-available/
+
+# Vérifier les chemins du cert dans le vhost demo
+ls -la /home/itech/ssl/itech-civ.org/
+sudo nano /etc/nginx/sites-available/lstracker-demo.conf
+# Ajuster ssl_certificate / ssl_certificate_key si noms différents
 
 # Activer
 sudo ln -sf /etc/nginx/sites-available/lstracker-prod.conf /etc/nginx/sites-enabled/
 sudo ln -sf /etc/nginx/sites-available/lstracker-demo.conf /etc/nginx/sites-enabled/
 
-# Désactiver le vhost par défaut nginx
-sudo rm -f /etc/nginx/sites-enabled/default
-
-# lstracker-prod.conf : aucun chemin de cert à ajuster (HTTP only, géré par le CDN)
-# lstracker-demo.conf : ajuster les chemins ssl_certificate / ssl_certificate_key
-#   si les noms réels dans /home/itech/ssl/itech-civ.org/ diffèrent.
-ls -la /home/itech/ssl/itech-civ.org/
-sudo nano /etc/nginx/sites-available/lstracker-demo.conf
-```
-
-Tester la syntaxe **sans démarrer** :
-
-```bash
+# Tester la syntaxe SANS démarrer (apache2 tourne toujours)
 sudo nginx -t
-# nginx: configuration file /etc/nginx/nginx.conf test is successful
+# nginx: configuration file test is successful
 ```
 
-Si erreur : la corriger avant de continuer.
+Si erreur → corriger avant de continuer.
 
-### 3. Modifier les bind ports Docker
+### 3. Forcer le bind 127.0.0.1 sur les composes
 
-Les compose ont déjà été mis à jour pour binder sur `127.0.0.1`. Appliquer :
+Si la demo tourne actuellement avec l'override `docker-compose.demo.public.yml` (port 9201 publiquement exposé), il faut le retirer pour que nginx prenne le relais :
 
 ```bash
-cd /opt/lstracker
+cd /opt/lstracker/lstracker-deploy-2.2.0
 
-# Pour la prod
-docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --force-recreate tracker_app
+# Demo : retirer l'override public
+docker compose --env-file .env.demo \
+               -f docker-compose.demo.yml \
+               up -d --force-recreate tracker_app
 
-# Vérifier que le port n'est plus exposé publiquement
+# Vérifier que le port est maintenant en loopback
 ss -tlnp | grep -E ':9200|:9201'
-# Doit afficher 127.0.0.1:9200 et 127.0.0.1:9201, pas 0.0.0.0
+# Doit montrer 127.0.0.1:9200 et 127.0.0.1:9201 (pas 0.0.0.0)
 ```
 
 ### 4. Bascule effective (downtime ~10s)
 
 ```bash
-# Arrêter apache2
+# Stopper apache2
 sudo systemctl stop apache2
 sudo systemctl disable apache2
 
@@ -223,30 +172,28 @@ sudo systemctl enable nginx
 
 # Vérifier
 sudo systemctl status nginx
-curl -fsS -k https://lstracker.org/actuator/health    # (ignore TLS via -k pour test rapide)
-curl -fsS https://lstracker.org/                       # page de login
 ```
 
-### 5. Mettre à jour le firewall
+### 5. Tester immédiatement
 
 ```bash
-sudo ufw allow 'Nginx Full'    # ouvre 80 + 443
-sudo ufw delete allow 9200/tcp # plus besoin (Docker bind sur 127.0.0.1)
-sudo ufw delete allow 9201/tcp
+# PROD via CDN (depuis l'extérieur)
+curl -fsS https://lstracker.org/
+curl -fsSI https://lstracker.org/ | grep -i 'HTTP\|Location'
+
+# DEMO direct HTTPS
+curl -fsS https://lstracker-demo.itech-civ.org/
+```
+
+### 6. Mettre à jour le firewall
+
+```bash
+sudo ufw allow 'Nginx Full'        # 80 + 443
+sudo ufw delete allow 9201/tcp     # plus besoin
 sudo ufw status
 ```
 
-### 6. Désinstaller apache2 (après quelques jours stable)
-
-Attendre **3-7 jours** sans incident avant de désinstaller. En attendant :
-
-```bash
-# Vérifier qu'apache2 reste bien stoppé
-sudo systemctl is-enabled apache2   # disabled attendu
-sudo systemctl is-active apache2    # inactive attendu
-```
-
-Quand confiance OK :
+### 7. Désinstaller apache2 (après 3-7 jours stable)
 
 ```bash
 sudo apt purge -y apache2 apache2-utils apache2-bin apache2-data
@@ -256,139 +203,75 @@ sudo rm -rf /etc/apache2
 
 ---
 
-## Installation nginx from scratch
-
-Si pas d'apache2 préexistant (nouveau serveur) :
+## Installation nginx from scratch (serveur vide)
 
 ```bash
 sudo apt update
 sudo apt install -y nginx
-
-# nginx démarre tout seul à l'install ; activer au boot
-sudo systemctl enable nginx
-
-# Vérifier
-sudo systemctl status nginx
-curl -fsS http://localhost/
-# Welcome to nginx page
-
-# Désactiver le vhost par défaut
 sudo rm -f /etc/nginx/sites-enabled/default
-sudo systemctl reload nginx
 
-# Ouvrir le firewall
-sudo ufw allow 'Nginx Full'
-```
-
-Puis suivre la [section Déploiement des vhosts](#déploiement-des-vhosts).
-
----
-
-## Déploiement des vhosts
-
-### 1. Copier les fichiers de conf
-
-```bash
-cd /opt/lstracker
-sudo cp config/nginx/lstracker-prod.conf /etc/nginx/sites-available/
-sudo cp config/nginx/lstracker-demo.conf /etc/nginx/sites-available/
-```
-
-### 2. Adapter les chemins du cert demo (si besoin)
-
-`lstracker-prod.conf` n'a pas de cert à configurer (HTTP only).
-
-`lstracker-demo.conf` pointe vers :
-- `/home/itech/ssl/itech-civ.org/fullchain.pem`
-- `/home/itech/ssl/itech-civ.org/privkey.pem`
-
-Si les noms réels diffèrent (ex: `wildcard.crt` + `wildcard.key`), éditer :
-
-```bash
-ls -la /home/itech/ssl/itech-civ.org/
-sudo nano /etc/nginx/sites-available/lstracker-demo.conf
-# Adapter les lignes ssl_certificate / ssl_certificate_key
-```
-
-### 3. Activer les vhosts
-
-```bash
+# Déployer les vhosts (cf. section 2 ci-dessus)
+sudo cp /opt/lstracker/lstracker-deploy-2.2.0/config/nginx/lstracker-*.conf \
+        /etc/nginx/sites-available/
 sudo ln -sf /etc/nginx/sites-available/lstracker-prod.conf /etc/nginx/sites-enabled/
 sudo ln -sf /etc/nginx/sites-available/lstracker-demo.conf /etc/nginx/sites-enabled/
 
+# Ajuster les chemins du cert demo si besoin
+sudo nano /etc/nginx/sites-available/lstracker-demo.conf
+
 sudo nginx -t
-sudo systemctl reload nginx
+sudo systemctl enable --now nginx
+
+sudo ufw allow 'Nginx Full'
 ```
 
 ---
 
 ## Tests et validation
 
-### 1. Reachability
+### Reachability
 
 ```bash
-# --- PROD : HTTP (TLS terminé par le CDN, l'origin reçoit HTTP) ---
-# Depuis le serveur (test bypass DNS)
+# --- PROD : HTTP (TLS terminé par le CDN) ---
+# Depuis le serveur
 curl -fsS -H "Host: lstracker.org" http://127.0.0.1/
-# Doit retourner la page de login (HTTP 200)
-
-# Simuler ce que le CDN envoie (header X-Forwarded-Proto: https)
 curl -fsS -H "Host: lstracker.org" -H "X-Forwarded-Proto: https" http://127.0.0.1/
 
-# Depuis l'extérieur (passe par le CDN → HTTPS public)
+# Depuis l'extérieur (via CDN)
 curl -fsS https://lstracker.org/
 
-# --- DEMO : HTTPS direct (TLS terminé par nginx) ---
+# --- DEMO : HTTPS direct ---
 curl -fsS -H "Host: lstracker-demo.itech-civ.org" https://127.0.0.1/ -k
 curl -fsS https://lstracker-demo.itech-civ.org/
 
-# --- HTTP demo doit rediriger en HTTPS ---
+# HTTP demo redirige bien en HTTPS
 curl -sI http://lstracker-demo.itech-civ.org/ | grep -i location
-# Location: https://lstracker-demo.itech-civ.org/...
+# Location: https://...
 ```
 
-### 2. Validation TLS
-
-Le TLS de **lstracker.org** est géré par le CDN externe — la validation se fait sur leur portail.
-
-Pour la **demo** (TLS terminé localement) :
+### Actuator bloqué publiquement
 
 ```bash
-# Chaîne complète et dates
-openssl s_client -connect lstracker-demo.itech-civ.org:443 \
-  -servername lstracker-demo.itech-civ.org < /dev/null 2>/dev/null \
-  | openssl x509 -noout -subject -dates
-
-# Test plus complet : SSL Labs
-# https://www.ssllabs.com/ssltest/analyze.html?d=lstracker-demo.itech-civ.org
-# Cible : note A ou A+
-```
-
-### 3. Redirections
-
-```bash
-# HTTP → HTTPS
-curl -sI http://lstracker.org/ | grep -i location
-# Location: https://lstracker.org/
-
-# www → apex
-curl -sI -H "Host: www.lstracker.org" https://lstracker.org/ -k | grep -i location
-# Location: https://lstracker.org/
-```
-
-### 4. Actuator bloqué publiquement
-
-```bash
-# Depuis l'extérieur : doit échouer
+# Doit échouer (403)
 curl -fsS https://lstracker.org/actuator/health
-# 403 Forbidden attendu
+curl -fsS https://lstracker-demo.itech-civ.org/actuator/health
 
-# Depuis l'host : doit marcher
+# Mais accessible depuis l'host
 curl -fsS http://127.0.0.1:9200/actuator/health
-# {"status":"UP"}
+curl -fsS http://127.0.0.1:9201/actuator/health
 ```
 
-### 5. Logs nginx
+### TLS demo (validation cert)
+
+```bash
+echo | openssl s_client -connect lstracker-demo.itech-civ.org:443 \
+   -servername lstracker-demo.itech-civ.org 2>/dev/null \
+   | openssl x509 -noout -subject -dates
+```
+
+Test complet via SSL Labs : https://www.ssllabs.com/ssltest/analyze.html?d=lstracker-demo.itech-civ.org — cible note **A** ou **A+**.
+
+### Logs nginx
 
 ```bash
 sudo tail -f /var/log/nginx/lstracker-prod.access.log
@@ -398,53 +281,42 @@ sudo tail -f /var/log/nginx/lstracker-prod.error.log
 
 ---
 
-## Renouvellement des certificats
+## Renouvellement cert wildcard
 
-Seul le cert **wildcard `*.itech-civ.org`** est à gérer localement. Le cert de `lstracker.org` est renouvelé par le fournisseur de domaine, rien à faire côté serveur.
+Seul le cert wildcard `*.itech-civ.org` est à gérer localement. Le cert de `lstracker.org` est renouvelé par le fournisseur de domaine.
 
-### Surveiller l'expiration (cert wildcard)
-
-```bash
-# Sur le serveur
-openssl x509 -noout -dates -subject \
-  -in /home/itech/ssl/itech-civ.org/fullchain.pem
-```
-
-Mettre en place une alerte (cron + mail) :
+### Surveillance auto
 
 ```bash
 sudo crontab -e
 ```
 
-Ajouter :
-
 ```cron
-# Vérifier expiration cert tous les jours à 06h00, alerte si < 30 jours
-0 6 * * * /opt/lstracker/scripts/check-cert-expiry.sh
+# Alerte si cert wildcard expire < 30 jours
+0 6 * * * /opt/lstracker/lstracker-deploy-2.2.0/scripts/check-cert-expiry.sh
 ```
 
-Le script `scripts/check-cert-expiry.sh` vérifie le cert wildcard et envoie un mail (configurable via `ALERT_EMAIL=...`) si l'expiration approche.
+Configurer l'alerte mail via `ALERT_EMAIL=ops@itech-ci.org` en haut du script (ou en env du cron).
 
 ### Procédure de renouvellement
 
-1. Obtenir le nouveau cert wildcard `*.itech-civ.org` (selon le processus interne d'ITECH-CI)
-2. Le placer en remplacement aux chemins déjà configurés :
-   ```bash
-   sudo cp nouveau.fullchain.pem /home/itech/ssl/itech-civ.org/fullchain.pem
-   sudo cp nouveau.key           /home/itech/ssl/itech-civ.org/privkey.pem
-   sudo chmod 644 /home/itech/ssl/itech-civ.org/fullchain.pem
-   sudo chmod 600 /home/itech/ssl/itech-civ.org/privkey.pem
-   ```
-3. Recharger nginx (pas besoin de restart, les connexions en cours ne sont pas coupées) :
-   ```bash
-   sudo nginx -t && sudo systemctl reload nginx
-   ```
-4. Vérifier que la nouvelle date d'expiration apparaît :
-   ```bash
-   echo | openssl s_client -connect lstracker-demo.itech-civ.org:443 \
-     -servername lstracker-demo.itech-civ.org 2>/dev/null \
-     | openssl x509 -noout -dates
-   ```
+```bash
+# 1. Obtenir le nouveau cert wildcard (selon process ITECH-CI)
+
+# 2. Remplacer aux chemins déjà configurés
+sudo cp nouveau.fullchain.pem /home/itech/ssl/itech-civ.org/fullchain.pem
+sudo cp nouveau.key           /home/itech/ssl/itech-civ.org/privkey.pem
+sudo chmod 644 /home/itech/ssl/itech-civ.org/fullchain.pem
+sudo chmod 600 /home/itech/ssl/itech-civ.org/privkey.pem
+
+# 3. Reload nginx (pas de restart, connexions en cours préservées)
+sudo nginx -t && sudo systemctl reload nginx
+
+# 4. Vérifier
+echo | openssl s_client -connect lstracker-demo.itech-civ.org:443 \
+   -servername lstracker-demo.itech-civ.org 2>/dev/null \
+   | openssl x509 -noout -dates
+```
 
 ---
 
@@ -452,66 +324,73 @@ Le script `scripts/check-cert-expiry.sh` vérifie le cert wildcard et envoie un 
 
 ### `nginx -t` échoue avec "no such file" sur les certs
 
-Les chemins dans la conf pointent vers des fichiers absents. Vérifier :
-
 ```bash
-ls -la /etc/ssl/lstracker/ /etc/ssl/itech-civ/
+ls -la /home/itech/ssl/itech-civ.org/
 ```
 
-Et adapter les chemins dans `/etc/nginx/sites-available/lstracker-*.conf`.
+Ajuster les chemins dans `/etc/nginx/sites-available/lstracker-demo.conf`.
 
 ### `502 Bad Gateway`
 
 Le container Docker derrière n'est pas joignable.
 
 ```bash
-# Le container tourne ?
 docker ps --filter "name=lst_"
-
-# Le port est-il en écoute sur 127.0.0.1 ?
 ss -tlnp | grep -E ':9200|:9201'
-# Doit montrer 127.0.0.1:9200 et 127.0.0.1:9201
-
-# Test direct
 curl -fsS http://127.0.0.1:9200/actuator/health
+docker logs lst_prod_app --tail 50
 ```
 
-Si le container est UP mais le curl échoue : healthcheck app encore en démarrage (60-90s) ou crash.
+Causes typiques :
+- Container down → `docker compose up -d` depuis le bundle
+- Healthcheck encore en démarrage (60-90s après `up -d`) → attendre
+- Le port n'est pas en loopback (override `public.yml` actif par erreur) → recréer sans l'override
 
-### `SSL: error:0A000086:SSL routines::certificate verify failed`
+### `SSL: certificate verify failed`
 
-La chaîne intermédiaire n'est pas concaténée au cert. Refaire le fullchain :
+La chaîne intermédiaire n'est pas concaténée au cert :
 
 ```bash
-cat cert.crt intermediate.crt > /etc/ssl/lstracker/lstracker.org.fullchain.pem
+cat cert.crt intermediate.crt > /home/itech/ssl/itech-civ.org/fullchain.pem
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 Vérifier la chaîne :
 
 ```bash
-openssl crl2pkcs7 -nocrl -certfile /etc/ssl/lstracker/lstracker.org.fullchain.pem \
+openssl crl2pkcs7 -nocrl -certfile /home/itech/ssl/itech-civ.org/fullchain.pem \
   | openssl pkcs7 -print_certs -noout | grep -E 'subject|issuer'
 ```
 
 Doit montrer au moins 2 certificats (le tien + l'intermédiaire).
 
-### Cookies de session pas envoyés / login impossible
+### Mixed content / URLs en `http://` au lieu de `https://`
 
-Spring Boot doit savoir qu'il est derrière un proxy HTTPS. Vérifier dans `application.properties` ou les vars d'env :
+Causes :
+1. Spring ne fait pas confiance aux headers proxy → vérifier `server.forward-headers-strategy=NATIVE` dans `application.properties` (déjà configuré dans ce projet).
+2. Le CDN n'envoie pas `X-Forwarded-Proto: https` → vérifier la config CDN.
+3. nginx ne propage pas le header → vérifier la conf vhost prod.
 
+Test rapide depuis l'extérieur :
+
+```bash
+curl -fsI https://lstracker.org/ | grep -i 'location\|set-cookie'
+# Toutes les URLs renvoyées doivent être en https://
 ```
-server.forward-headers-strategy=NATIVE
+
+### Login impossible après bascule nginx
+
+Probablement un problème de cookie SameSite/Secure. Vérifier que `server.forward-headers-strategy=NATIVE` est bien actif :
+
+```bash
+docker exec lst_prod_app env | grep -i forward
+# SERVER_FORWARD_HEADERS_STRATEGY=NATIVE ou via application.properties
 ```
 
-Si manquant, ajouter dans le docker-compose :
+Si non, ajouter dans le compose env :
 
 ```yaml
-environment:
-  SERVER_FORWARD_HEADERS_STRATEGY: NATIVE
+SERVER_FORWARD_HEADERS_STRATEGY: NATIVE
 ```
 
-Et `up -d` pour recréer le container.
-
-### Mixed content warnings dans le navigateur
-
-L'app génère des URLs en `http://` au lieu de `https://`. Les headers `X-Forwarded-Proto` sont bien envoyés par nginx (cf. conf), donc le problème est probablement `server.forward-headers-strategy` non configuré côté Spring (cf. ci-dessus).
+Puis `up -d --force-recreate tracker_app`.

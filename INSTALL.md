@@ -1,22 +1,18 @@
 # LSTracker — Installation rapide
 
-> Si tu lis ce fichier, tu as extrait le bundle `lstracker-deploy-v<version>.tar.gz` quelque part sur un serveur Linux. Suis les étapes ci-dessous pour démarrer la DEMO ou la PROD.
+> Si tu lis ce fichier, tu as extrait le bundle `lstracker-deploy-vX.Y.Z.tar.gz` sur un serveur Linux. Voici les 4-5 commandes pour démarrer.
 
-## Prérequis serveur
+## Prérequis
 
 - Linux x86_64 (Ubuntu 22.04+ recommandé)
-- Docker Engine 24+ et Docker Compose plugin v2
-- Accès internet (pour pull l'image depuis ghcr.io/itech-ci/)
-- 8 GiB RAM minimum pour la demo seule, 96 GiB pour demo + prod
-
-Vérifier :
+- Docker 24+ et Docker Compose v2
 
 ```bash
-docker --version          # Docker version 24+
-docker compose version    # v2.x+
+docker --version
+docker compose version
 ```
 
-Si Docker n'est pas installé :
+Si Docker n'est pas là :
 
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
@@ -24,13 +20,13 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-## Déployer la DEMO
+## Démarrer la DEMO
 
 ```bash
 # 1. Préparer .env.demo
 cp .env.demo.example .env.demo
 
-# Générer un mot de passe DB fort et un secret JWT
+# Générer les secrets
 echo "POSTGRES_PASSWORD=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
 echo "JWT_SECRET=$(openssl rand -hex 64)"
 
@@ -38,13 +34,16 @@ echo "JWT_SECRET=$(openssl rand -hex 64)"
 nano .env.demo
 
 # Vérifier qu'il n'y a plus aucun CHANGE_ME
-grep CHANGE_ME .env.demo && echo "ENCORE DU CHANGE_ME — corriger" || echo "OK"
+grep CHANGE_ME .env.demo && echo "ENCORE DU CHANGE_ME" || echo "OK"
 
-# Protéger le fichier
 chmod 600 .env.demo
 
-# 2. Démarrer (l'image est pull automatiquement)
-docker compose --env-file .env.demo -f docker-compose.demo.yml up -d
+# 2. Démarrer (l'image est pull automatiquement depuis ghcr.io/itech-ci/)
+#    Avec exposition publique temporaire sur :9201 (avant migration nginx)
+docker compose --env-file .env.demo \
+               -f docker-compose.demo.yml \
+               -f docker-compose.demo.public.yml \
+               up -d
 
 # 3. Vérifier
 docker ps --filter "name=lst_demo_"
@@ -55,26 +54,11 @@ curl -fsS http://127.0.0.1:9201/actuator/health
 # {"status":"UP"}
 ```
 
-L'app demo écoute sur `127.0.0.1:9201` (loopback uniquement). Pour y accéder publiquement, configurer nginx en reverse proxy (voir [docs/NGINX.md](docs/NGINX.md)).
+L'app demo est ensuite accessible publiquement sur **http://<ip-serveur>:9201**.
 
-**Accès temporaire sans nginx :** utiliser l'override `docker-compose.demo.public.yml` qui expose le port publiquement :
+> ⚠️ L'override `docker-compose.demo.public.yml` est pour la **phase de validation** uniquement. En production, utiliser nginx + HTTPS (cf. [docs/NGINX.md](docs/NGINX.md)) et lancer sans ce fichier.
 
-```bash
-docker compose --env-file .env.demo \
-               -f docker-compose.demo.yml \
-               -f docker-compose.demo.public.yml \
-               up -d
-
-# Puis : http://<ip-serveur>:9201
-```
-
-⚠️ L'override `public.yml` est destiné à la **phase de validation uniquement**. Pour exposer la demo en production sur internet, utiliser nginx + HTTPS (voir docs/NGINX.md).
-
-## Déployer la PROD
-
-Voir [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) pour la procédure complète (validation, migration, backups).
-
-Résumé express :
+## Démarrer la PROD
 
 ```bash
 cp .env.prod.example .env.prod
@@ -82,13 +66,40 @@ nano .env.prod   # secrets DIFFÉRENTS de la demo
 chmod 600 .env.prod
 
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+docker logs lst_prod_app -f --tail 100
 ```
+
+La prod est bindée sur `127.0.0.1:9200` — accessible uniquement via nginx (cf. [docs/NGINX.md](docs/NGINX.md)).
 
 ## Documentation complète
 
-| Fichier | Contenu |
+| Document | Contenu |
 |---|---|
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Runbook complet (provisioning → DEMO → validation → PROD) |
-| [docs/NGINX.md](docs/NGINX.md) | Reverse proxy nginx (vhosts, certs, migration apache2) |
-| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Backups, restauration, rotation secrets, monitoring, troubleshooting |
-| [scripts/](scripts/) | Scripts d'automatisation à utiliser après l'installation |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Runbook complet (provisioning, validation, migration de données) |
+| [docs/NGINX.md](docs/NGINX.md) | Reverse proxy nginx (vhosts, certs, migration apache2 → nginx) |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Backups, restauration, mises à jour, rotation secrets, troubleshooting |
+| [scripts/](scripts/) | `backup-db.sh`, `restore-db.sh`, `rotate-secrets.sh`, `check-cert-expiry.sh` |
+| [VERSION](VERSION) | Métadonnées du bundle (version, date build, image, commit) |
+
+## Mettre à jour vers une nouvelle version
+
+```bash
+NEW_VERSION=2.3.0
+URL=https://github.com/ITECH-CI/LSTracker_web/releases/download/v${NEW_VERSION}
+
+cd /opt/lstracker
+curl -fsSLO ${URL}/lstracker-deploy-${NEW_VERSION}.tar.gz
+curl -fsSLO ${URL}/lstracker-deploy-${NEW_VERSION}.tar.gz.sha256
+sha256sum -c lstracker-deploy-${NEW_VERSION}.tar.gz.sha256
+tar -xzf lstracker-deploy-${NEW_VERSION}.tar.gz
+
+# Reprendre les .env existants
+cp lstracker-deploy-2.2.0/.env.{demo,prod} lstracker-deploy-${NEW_VERSION}/
+
+# Appliquer (tester sur demo d'abord)
+cd lstracker-deploy-${NEW_VERSION}
+docker compose --env-file .env.demo -f docker-compose.demo.yml up -d
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+```
+
+Détail dans [docs/OPERATIONS.md](docs/OPERATIONS.md) §"Mise à jour de version".

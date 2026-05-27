@@ -1,30 +1,38 @@
 # Runbook de déploiement — LSTracker Web
 
-> Procédure complète : déploiement initial DEMO → validation → déploiement PROD sur le même serveur (96 GiB RAM / 24 cores).
+> Workflow simplifié : à chaque release tag `v*`, GitHub Actions build l'image Docker **et** un bundle de déploiement attaché à la GitHub Release. Sur le serveur, un ops télécharge ce bundle (un seul fichier) et lance la stack. Pas de clone git, pas de code source, pas de Maven.
 
 ## Sommaire
 
 1. [Vue d'ensemble](#vue-densemble)
-2. [Provisioning du serveur](#provisioning-du-serveur)
-3. [Phase 1 — Déploiement DEMO](#phase-1--déploiement-demo)
-4. [Phase 2 — Validation DEMO](#phase-2--validation-demo)
-5. [Phase 3 — Déploiement PROD](#phase-3--déploiement-prod)
-6. [Phase 4 — Validation PROD](#phase-4--validation-prod)
-7. [Rollback](#rollback)
-8. [Checklist condensée](#checklist-condensée)
+2. [Prérequis serveur (une seule fois)](#prérequis-serveur-une-seule-fois)
+3. [Récupérer le bundle de release](#récupérer-le-bundle-de-release)
+4. [Phase 1 — Déploiement DEMO](#phase-1--déploiement-demo)
+5. [Phase 2 — Validation DEMO](#phase-2--validation-demo)
+6. [Phase 3 — Déploiement PROD](#phase-3--déploiement-prod)
+7. [Phase 4 — Validation PROD](#phase-4--validation-prod)
+8. [Rollback](#rollback)
+9. [Checklist condensée](#checklist-condensée)
 
 ---
 
 ## Vue d'ensemble
 
 ```
-Serveur Linux (96 GiB RAM, 24 cores)
-├── DEMO   : ports 9201 (app) + 5436 (db, 127.0.0.1 only)
-└── PROD   : ports 9200 (app) + 5435 (db, 127.0.0.1 only)
-
-Networks Docker distincts → isolation totale demo/prod.
-Bases de données séparées, secrets JWT séparés.
+GitHub Actions (sur tag v*)
+   │
+   ├── Build image Docker        →  ghcr.io/itech-ci/labsampletracker:<version>
+   └── Génère bundle             →  lstracker-deploy-<version>.tar.gz
+                                     (attaché à la GitHub Release)
+                                                │
+                                                ▼
+                                    ┌──────────────────────┐
+                                    │  Serveur de déploiement │
+                                    │  curl + tar + docker compose up │
+                                    └──────────────────────┘
 ```
+
+Sur le serveur, deux environnements indépendants côte à côte :
 
 | Élément | DEMO | PROD |
 |---|---|---|
@@ -33,101 +41,73 @@ Bases de données séparées, secrets JWT séparés.
 | App container | `lst_demo_app` | `lst_prod_app` |
 | DB container | `lst_demo_db` | `lst_prod_db` |
 | Network | `lst_demo_net` | `lst_prod_net` |
-| Image Docker | `ghcr.io/itech-ci/labsampletracker:<tag>` | `ghcr.io/itech-ci/labsampletracker:<tag>` |
-| Port app | 9201 | 9200 |
-| Port DB (loopback) | 5436 | 5435 |
+| Port app (loopback) | 127.0.0.1:9201 | 127.0.0.1:9200 |
+| Port DB (loopback) | 127.0.0.1:5436 | 127.0.0.1:5435 |
+| URL publique (via nginx) | `https://lstracker-demo.itech-civ.org` | `https://lstracker.org` |
+
+Networks Docker distincts → isolation totale demo/prod. Bases de données séparées, secrets JWT séparés.
 
 ---
 
-## Provisioning du serveur
+## Prérequis serveur (une seule fois)
 
-À faire **une seule fois** avant le premier déploiement.
+Si tu déploies sur un serveur où Docker tourne déjà (cas le plus courant si la prod actuelle tourne sous apache2 + Docker), **saute directement à la section suivante**.
 
-### 1. Système de base
-
-```bash
-# OS : Ubuntu 22.04 LTS (ou Debian 12)
-# Connexion SSH avec un user non-root sudoer
-
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y curl ca-certificates gnupg lsb-release ufw
-```
-
-### 2. Docker Engine + Compose plugin
+### Installer Docker (si serveur vide)
 
 ```bash
-# Méthode officielle Docker (cf. https://docs.docker.com/engine/install/ubuntu/)
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-  sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-sudo chmod a+r /etc/apt/keyrings/docker.gpg
-
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# Ajouter le user au groupe docker (évite sudo à chaque commande)
+# OS : Ubuntu 22.04 LTS ou Debian 12
+curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER
-# Logout/login pour activer le groupe, ou :
 newgrp docker
 
-# Vérifier
-docker --version            # Docker version 26.x+
-docker compose version      # Docker Compose version v2.x+
+docker --version          # 24+
+docker compose version    # v2+
 ```
 
-### 3. Firewall
+### Firewall (si la demo doit être accessible sans nginx pour validation)
 
 ```bash
-# Autoriser SSH + ports applicatifs publics seulement
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
 sudo ufw allow OpenSSH
-sudo ufw allow 9200/tcp   # PROD app
-sudo ufw allow 9201/tcp   # DEMO app
-# Postgres n'est PAS exposé publiquement (bind 127.0.0.1 dans compose).
+sudo ufw allow 9201/tcp comment 'LSTracker demo (temporaire pré-nginx)'
 sudo ufw enable
-sudo ufw status
 ```
 
-### 4. Login GitHub Container Registry
+Pour la **prod via nginx + HTTPS**, voir [NGINX.md](NGINX.md).
 
-Pour pull les images privées depuis `ghcr.io`. **Même si le repo est public**, un login évite le rate-limit anonyme.
+---
 
-```bash
-# Sur ton poste : créer un Personal Access Token (classic) avec scope read:packages
-# https://github.com/settings/tokens/new?scopes=read:packages
+## Récupérer le bundle de release
 
-# Sur le serveur :
-echo "ghp_xxxxxxxx" | docker login ghcr.io -u <ton-github-username> --password-stdin
-# Login Succeeded
-```
-
-### 5. Préparer l'arborescence
+Tout commence ici. Choisir la version voulue sur https://github.com/ITECH-CI/LSTracker_web/releases.
 
 ```bash
+# Variables (adapter la version)
+VERSION=2.2.0
+URL=https://github.com/ITECH-CI/LSTracker_web/releases/download/v${VERSION}
+
+# Télécharger bundle + checksum
 sudo mkdir -p /opt/lstracker
 sudo chown $USER:$USER /opt/lstracker
 cd /opt/lstracker
 
-# Cloner le repo (les fichiers Docker / compose / scripts y sont)
-git clone https://github.com/ITECH-CI/LSTracker_web.git .
+curl -fsSLO ${URL}/lstracker-deploy-${VERSION}.tar.gz
+curl -fsSLO ${URL}/lstracker-deploy-${VERSION}.tar.gz.sha256
 
-# Vérifier
+# Vérifier l'intégrité
+sha256sum -c lstracker-deploy-${VERSION}.tar.gz.sha256
+# lstracker-deploy-2.2.0.tar.gz: OK
+
+# Extraire
+tar -xzf lstracker-deploy-${VERSION}.tar.gz
+cd lstracker-deploy-${VERSION}
+
+# Vérifier les métadonnées
+cat VERSION
 ls -la
-# Tu dois voir : Dockerfile, docker-compose.{demo,prod}.yml, .env.{demo,prod}.example,
-#                config/, scripts/, docs/
 ```
 
-### 6. Configurer les dossiers de logs et backups
-
-```bash
-mkdir -p /opt/lstracker/logs/demo /opt/lstracker/logs/prod
-mkdir -p /opt/lstracker/backups/{demo,prod}
-```
+Le dossier contient tout : composes, `.env.example`, configs nginx, scripts ops, docs.
 
 ---
 
@@ -136,109 +116,60 @@ mkdir -p /opt/lstracker/backups/{demo,prod}
 ### 1.1 Préparer `.env.demo`
 
 ```bash
-cd /opt/lstracker
+cd /opt/lstracker/lstracker-deploy-2.2.0
 cp .env.demo.example .env.demo
 
-# Générer les secrets propres (1 par 1)
+# Générer les secrets (à copier dans .env.demo)
 echo "POSTGRES_PASSWORD=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
 echo "JWT_SECRET=$(openssl rand -hex 64)"
 
-# Éditer .env.demo et remplacer les CHANGE_ME_* par les valeurs générées
 nano .env.demo
-```
+# Remplacer toutes les valeurs CHANGE_ME_*
 
-Vérifier qu'**aucune valeur ne contient encore `CHANGE_ME`** :
+# Vérifier qu'il n'y a plus aucun CHANGE_ME
+grep CHANGE_ME .env.demo && echo "ENCORE DU CHANGE_ME" || echo "OK"
 
-```bash
-grep CHANGE_ME .env.demo
-# Aucune sortie attendue → OK
-```
-
-Verrouiller les permissions :
-
-```bash
+# Protéger le fichier (secrets)
 chmod 600 .env.demo
-ls -la .env.demo   # -rw------- attendu
 ```
 
-### 1.2 Choisir le tag d'image
+### 1.2 Démarrer DEMO
 
-Lister les tags disponibles sur ghcr.io :
-
-```bash
-# Via gh CLI (depuis ton poste, pas le serveur)
-gh api /orgs/ITECH-CI/packages/container/labsampletracker/versions \
-  --jq '.[] | .metadata.container.tags[]' | sort -u
-```
-
-Ou directement sur https://github.com/orgs/ITECH-CI/packages.
-
-Mettre le bon tag dans `.env.demo` :
+**Sans nginx (phase de validation initiale)** — l'app sera accessible directement sur le port 9201 :
 
 ```bash
-sed -i 's|^APP_IMAGE=.*|APP_IMAGE=ghcr.io/itech-ci/labsampletracker:2.2.0|' .env.demo
-grep APP_IMAGE .env.demo
-```
+docker compose --env-file .env.demo \
+               -f docker-compose.demo.yml \
+               -f docker-compose.demo.public.yml \
+               up -d
 
-### 1.3 Démarrer DEMO
-
-```bash
-cd /opt/lstracker
-
-# Pull explicite (vérifie l'accès ghcr.io)
-docker compose --env-file .env.demo -f docker-compose.demo.yml pull
-
-# Démarrer (DB d'abord, puis app via depends_on healthy)
-docker compose --env-file .env.demo -f docker-compose.demo.yml up -d
-
-# Suivre le démarrage
-docker logs lst_demo_db -f --tail 50
-# Ctrl+C quand tu vois "database system is ready to accept connections"
-
+docker ps --filter "name=lst_demo_"
 docker logs lst_demo_app -f --tail 50
-# Ctrl+C quand tu vois "Started LabSampleTrackerApplication"
+# Attendre "Started LabSampleTrackerApplication" puis Ctrl+C
 ```
 
-### 1.4 Vérifications post-démarrage DEMO
+**Avec nginx** (recommandé une fois nginx en place — cf. [NGINX.md](NGINX.md)) :
 
 ```bash
-# Healthcheck interne (loopback uniquement — l'app n'est PAS exposée publiquement
-# directement, nginx prend le relais cf. étape 1.5)
+docker compose --env-file .env.demo \
+               -f docker-compose.demo.yml \
+               up -d
+# Le port 9201 est bindé sur 127.0.0.1, accessible uniquement via nginx
+```
+
+### 1.3 Vérifications post-démarrage
+
+```bash
+# Healthcheck
 curl -fsS http://127.0.0.1:9201/actuator/health
 # {"status":"UP"}
 
-# Le port n'est PAS exposé publiquement (Docker bind 127.0.0.1:9201)
-ss -tlnp | grep :9201
-# Doit afficher 127.0.0.1:9201, pas 0.0.0.0
+# Avec override public.yml : aussi accessible depuis l'extérieur
+curl -fsS http://<ip-serveur>:9201/actuator/health   # depuis ton poste
 
-# DB accessible (loopback only)
-docker exec -it lst_demo_db psql -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT version();"
-
-# Resource usage
-docker stats --no-stream lst_demo_app lst_demo_db
-```
-
-### 1.5 Configurer nginx pour exposer la DEMO en HTTPS
-
-> Voir **[NGINX.md](NGINX.md)** pour la procédure complète (vhosts, certs, migration apache2).
-
-Résumé pour la DEMO :
-
-```bash
-# 1. DNS : créer A record lstracker-demo.itech-civ.org → IP serveur
-
-# 2. Vérifier que le cert wildcard *.itech-civ.org est en place
-ls -la /home/itech/ssl/itech-civ.org/
-# fullchain.pem + privkey.pem attendus (sinon adapter les noms dans le vhost)
-
-# 3. Déployer le vhost demo
-sudo cp config/nginx/lstracker-demo.conf /etc/nginx/sites-available/
-sudo ln -sf /etc/nginx/sites-available/lstracker-demo.conf /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-
-# 4. Tester
-curl -fsS https://lstracker-demo.itech-civ.org/actuator/health   # 403 attendu
-curl -fsS https://lstracker-demo.itech-civ.org/                  # page login
+# DB accessible
+docker exec lst_demo_db psql -U appuser_demo -d sample_tracker_demo \
+  -c "SELECT version();"
 ```
 
 ---
@@ -249,65 +180,47 @@ curl -fsS https://lstracker-demo.itech-civ.org/                  # page login
 
 ### 2.1 Tests fonctionnels manuels
 
-Sur le frontend `http://<ip-publique>:9201` :
-
-- [ ] Login avec un compte admin créé via SQL ou seed
+- [ ] Login avec un compte admin (créé via SQL initial ou seed)
 - [ ] Navigation principale (dashboard, listes, formulaires)
 - [ ] Création d'un échantillon → tracking → réception lab
 - [ ] Génération de rapport (Jasper)
 - [ ] Logout + refresh token cycle
 
-### 2.2 Tests de charge légers (optionnel mais recommandé)
+### 2.2 Vérifications sécurité
 
 ```bash
-# Installer ab si besoin
-sudo apt install -y apache2-utils
-
-# 500 requêtes, 20 concurrentes, sur /actuator/health
-ab -n 500 -c 20 http://localhost:9201/actuator/health
-
-# Vérifier latence p95, taux d'erreurs
-# Si ça crashe ou si la latence explose → investiguer avant prod
-```
-
-### 2.3 Vérifications sécurité
-
-```bash
-# Postgres n'est PAS exposé publiquement
-nmap -p 5436 <ip-publique-serveur>
-# 5436/tcp filtered ou closed attendu (pas open)
+# Postgres n'est PAS exposé publiquement (loopback only)
+ss -tlnp | grep :5436
+# 127.0.0.1:5436 attendu, pas 0.0.0.0
 
 # JWT secret n'est pas un fallback hardcodé
 docker exec lst_demo_app env | grep JWT_SECRET | wc -c
 # > 130 attendu (128 hex chars + "JWT_SECRET=")
 ```
 
-### 2.4 Période d'observation
+### 2.3 Période d'observation
 
 Laisser tourner la DEMO **au moins 48-72h** avec usage réel par les futurs utilisateurs.
 
-Surveiller :
-
 ```bash
-# Erreurs dans les logs
 docker logs lst_demo_app --since 24h | grep -iE 'error|exception|fatal' | tail -30
-
-# Stabilité mémoire (ne devrait pas grimper sans cesse)
-docker stats --no-stream lst_demo_app
+docker stats --no-stream lst_demo_app   # mémoire ne doit pas grimper sans cesse
 ```
 
-Si rien d'anormal après cette période → passer à la **Phase 3**.
+Si rien d'anormal → passer à la **Phase 3**.
 
 ---
 
 ## Phase 3 — Déploiement PROD
 
-> **Prérequis :** Phase 2 validée.
+> **Prérequis :** Phase 2 validée. Idéalement nginx déjà en place (cf. [NGINX.md](NGINX.md), section migration apache2).
+
+Le bundle déjà téléchargé contient aussi le compose prod. Pas besoin de re-télécharger.
 
 ### 3.1 Préparer `.env.prod`
 
 ```bash
-cd /opt/lstracker
+cd /opt/lstracker/lstracker-deploy-2.2.0
 cp .env.prod.example .env.prod
 
 # Générer des secrets DIFFÉRENTS de la demo
@@ -315,23 +228,18 @@ echo "POSTGRES_PASSWORD=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c
 echo "JWT_SECRET=$(openssl rand -hex 64)"
 
 nano .env.prod
-# Remplacer les CHANGE_ME_* + APP_IMAGE
-# IMPORTANT : POSTGRES_DB doit être différent (sample_tracker_prod) de la demo (sample_tracker_demo)
-# IMPORTANT : POSTGRES_USER doit être différent (appuser_prod) de la demo (appuser_demo)
+# Remplacer CHANGE_ME_*. IMPORTANT :
+#   - POSTGRES_DB et POSTGRES_USER différents de la demo
+#   - JWT_SECRET différent de la demo
 
-grep CHANGE_ME .env.prod   # Aucune sortie attendue
+grep CHANGE_ME .env.prod   # aucune sortie attendue
 chmod 600 .env.prod
 ```
 
 ### 3.2 Démarrer PROD
 
 ```bash
-docker compose --env-file .env.prod -f docker-compose.prod.yml pull
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
-
-# Suivre
-docker logs lst_prod_db -f --tail 50
-# Attendre "ready to accept connections" puis Ctrl+C
 
 docker logs lst_prod_app -f --tail 100
 # Attendre "Started LabSampleTrackerApplication"
@@ -341,56 +249,29 @@ docker logs lst_prod_app -f --tail 100
 
 ```bash
 curl -fsS http://127.0.0.1:9200/actuator/health
+ss -tlnp | grep :9200    # 127.0.0.1:9200 attendu
 
-# Le port n'est PAS exposé publiquement (Docker bind 127.0.0.1:9200)
-ss -tlnp | grep :9200
-# Doit afficher 127.0.0.1:9200, pas 0.0.0.0
-
-# Vérifier qu'on est bien sur la DB PROD (pas demo)
-docker exec lst_prod_db psql -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT current_database();"
-# Doit retourner sample_tracker_prod (ou ton nom)
-
-# Containers tournent côte à côte sans conflit ?
+# Containers cohabitent ?
 docker ps --filter "name=lst_"
-# Doit montrer : lst_demo_app, lst_demo_db, lst_prod_app, lst_prod_db
+# Doit montrer lst_demo_{app,db} ET lst_prod_{app,db}
 ```
 
 ### 3.4 Configurer nginx pour exposer la PROD
 
-> Voir **[NGINX.md](NGINX.md)** pour le détail, en particulier la section [Migration apache2 → nginx](NGINX.md#migration-apache2--nginx) si apache2 servait déjà la prod.
->
-> Rappel : le TLS de `lstracker.org` est géré par le fournisseur de domaine (CDN externe). nginx écoute en HTTP, aucun cert à placer sur le serveur pour la prod.
-
-```bash
-# 1. Déployer le vhost prod (HTTP only — pas de cert à configurer)
-sudo cp config/nginx/lstracker-prod.conf /etc/nginx/sites-available/
-sudo ln -sf /etc/nginx/sites-available/lstracker-prod.conf /etc/nginx/sites-enabled/
-
-# 2. Test syntaxe + reload
-sudo nginx -t && sudo systemctl reload nginx
-
-# 3. Tester depuis le serveur (HTTP local, comme le CDN nous appelle)
-curl -fsS -H "Host: lstracker.org" http://127.0.0.1/
-
-# 4. Tester depuis l'extérieur (via le CDN)
-curl -fsS https://lstracker.org/
-curl -sI https://lstracker.org/actuator/health   # 403 attendu (bloqué publiquement)
-```
+Voir **[NGINX.md](NGINX.md)** §Migration apache2 → nginx pour la migration sans interruption.
 
 ### 3.5 Importer les données de production (si migration depuis ancien serveur)
 
-Si tu migres depuis une ancienne installation :
-
 ```bash
-# Sur l'ancien serveur : dump
+# Sur l'ancien serveur
 pg_dump -h localhost -U appuser sample_tracker > /tmp/prod-dump-$(date +%Y%m%d).sql
 
-# Transférer sur le nouveau serveur
-scp ancien:/tmp/prod-dump-*.sql /opt/lstracker/backups/prod/
+# Transférer sur le nouveau
+scp ancien-serveur:/tmp/prod-dump-*.sql /tmp/
 
-# Sur le nouveau serveur : restaurer
+# Restaurer dans le nouveau container
 docker exec -i lst_prod_db psql -U appuser_prod -d sample_tracker_prod \
-  < /opt/lstracker/backups/prod/prod-dump-YYYYMMDD.sql
+  < /tmp/prod-dump-YYYYMMDD.sql
 
 # Vérifier
 docker exec lst_prod_db psql -U appuser_prod -d sample_tracker_prod \
@@ -401,20 +282,13 @@ docker exec lst_prod_db psql -U appuser_prod -d sample_tracker_prod \
 
 ## Phase 4 — Validation PROD
 
-### 4.1 Smoke test immédiat
+### 4.1 Smoke test
 
 - [ ] Login avec un compte réel
-- [ ] Navigation principale OK
-- [ ] Un compte peut effectuer une action de bout en bout
-- [ ] Aucune erreur 500 dans les logs
+- [ ] Action de bout en bout (création + lecture + modification)
+- [ ] Aucune erreur 500 dans `docker logs lst_prod_app --tail 100`
 
-```bash
-docker logs lst_prod_app --tail 100 | grep -iE 'error|exception' | head -20
-```
-
-### 4.2 Backups automatisés DB
-
-Configurer un cron quotidien :
+### 4.2 Backups automatisés
 
 ```bash
 crontab -e
@@ -422,124 +296,108 @@ crontab -e
 
 Ajouter :
 
-```
-# Backup DB PROD chaque jour à 03h00, retention 30 jours
-0 3 * * * /opt/lstracker/scripts/backup-db.sh prod >> /opt/lstracker/logs/backup.log 2>&1
+```cron
+# Backup DB PROD chaque jour à 03h00
+0 3 * * * /opt/lstracker/lstracker-deploy-2.2.0/scripts/backup-db.sh prod >> /opt/lstracker/backup.log 2>&1
 ```
 
-(le script `backup-db.sh` est dans le repo — cf. `docs/OPERATIONS.md`)
+Voir [OPERATIONS.md](OPERATIONS.md) pour le détail.
 
-### 4.3 Monitoring minimal
+### 4.3 Monitoring externe
+
+Configurer un uptime monitor sur `https://lstracker.org/` (UptimeRobot, Healthchecks.io). Alerte si DOWN > 2 min.
+
+---
+
+## Mise à jour vers une nouvelle version
+
+C'est là où le workflow bundle brille — pas besoin de modifier le compose, juste de **télécharger le nouveau bundle** et appliquer.
 
 ```bash
-# Healthcheck externe via uptime monitor (UptimeRobot, Healthchecks.io)
-# URL à monitorer : http://<ip-publique>:9200/actuator/health
-# Alerte si != UP pendant 2 minutes
+NEW_VERSION=2.3.0
+URL=https://github.com/ITECH-CI/LSTracker_web/releases/download/v${NEW_VERSION}
+
+cd /opt/lstracker
+curl -fsSLO ${URL}/lstracker-deploy-${NEW_VERSION}.tar.gz
+curl -fsSLO ${URL}/lstracker-deploy-${NEW_VERSION}.tar.gz.sha256
+sha256sum -c lstracker-deploy-${NEW_VERSION}.tar.gz.sha256
+tar -xzf lstracker-deploy-${NEW_VERSION}.tar.gz
+
+# Backup PRÉ-upgrade obligatoire
+cd lstracker-deploy-2.2.0   # ancienne version pour le script
+./scripts/backup-db.sh prod
+
+# Copier le .env existant dans le nouveau dossier
+cp .env.demo .env.prod /opt/lstracker/lstracker-deploy-${NEW_VERSION}/
+
+# Tester sur DEMO d'abord
+cd /opt/lstracker/lstracker-deploy-${NEW_VERSION}
+docker compose --env-file .env.demo -f docker-compose.demo.yml up -d
+docker logs lst_demo_app -f --tail 50
+# Tester pendant 24-72h
+
+# Si OK, appliquer la PROD
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+docker logs lst_prod_app -f --tail 100
+curl -fsS http://127.0.0.1:9200/actuator/health
 ```
 
-### 4.4 Communication aux utilisateurs
-
-- [ ] Annoncer l'URL prod
-- [ ] Donner les credentials aux admins
-- [ ] Documenter l'URL demo séparée pour tests futurs
+Tu peux supprimer les anciens dossiers `lstracker-deploy-X.Y.Z` après quelques jours de stabilité.
 
 ---
 
 ## Rollback
 
-### Rollback DEMO
+### Rollback DEMO ou PROD vers version précédente
 
 ```bash
 cd /opt/lstracker
-docker compose --env-file .env.demo -f docker-compose.demo.yml down
-# Garder le volume Postgres si rollback temporaire :
-# docker volume ls | grep demo
-# Re-up plus tard avec une image précédente :
-sed -i 's|^APP_IMAGE=.*|APP_IMAGE=ghcr.io/itech-ci/labsampletracker:2.1.0|' .env.demo
-docker compose --env-file .env.demo -f docker-compose.demo.yml up -d
+ls -d lstracker-deploy-*    # voir les versions disponibles localement
+
+# Backup d'urgence avant rollback
+cd lstracker-deploy-2.3.0
+./scripts/backup-db.sh prod
+
+# Re-démarrer avec l'ancienne version (le .env est compatible si schéma DB inchangé)
+cd /opt/lstracker/lstracker-deploy-2.2.0
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+docker logs lst_prod_app -f --tail 100
 ```
 
-### Rollback PROD vers version précédente
+Si **schéma DB incompatible** (migration Liquibase qui a tourné) → restaurer le dump pré-upgrade :
 
 ```bash
-cd /opt/lstracker
-
-# 1. Backup DB d'urgence
-docker exec lst_prod_db pg_dump -U appuser_prod sample_tracker_prod \
-  > /opt/lstracker/backups/prod/rollback-$(date +%Y%m%d-%H%M).sql
-
-# 2. Repasser à la version précédente
-sed -i 's|^APP_IMAGE=.*|APP_IMAGE=ghcr.io/itech-ci/labsampletracker:<version-precedente>|' .env.prod
-docker compose --env-file .env.prod -f docker-compose.prod.yml pull
-docker compose --env-file .env.prod -f docker-compose.prod.yml up -d tracker_app
-
-# 3. Si schéma DB incompatible : restaurer dump pré-upgrade
-# docker exec -i lst_prod_db psql -U appuser_prod -d sample_tracker_prod < backup-pre-upgrade.sql
-```
-
-### Rollback rotation secrets
-
-Le script `rotate-secrets.sh` rollback automatiquement en cas d'échec. Manuel :
-
-```bash
-ls -la .env.prod.backup.*
-cp .env.prod.backup.YYYYMMDD-HHMMSS .env.prod
-
-# Remettre l'ancien password en BD (récupérer l'ancien depuis la backup)
-OLD_PWD=$(grep '^POSTGRES_PASSWORD=' .env.prod.backup.YYYYMMDD-HHMMSS | cut -d= -f2-)
-CURRENT_PWD=$(grep '^POSTGRES_PASSWORD=' .env.prod | cut -d= -f2-)
-# Wait — restaurer depuis le backup change déjà la valeur dans le fichier.
-# Donc à ce stade .env.prod contient l'ancien et c'est ce qu'on veut.
-# Reste à le remettre dans Postgres :
-docker exec -e PGPASSWORD="$CURRENT_PWD" lst_prod_db \
-  psql -U $POSTGRES_USER -d $POSTGRES_DB \
-  -c "ALTER USER \"$POSTGRES_USER\" WITH PASSWORD '$OLD_PWD';"
-
-docker compose --env-file .env.prod -f docker-compose.prod.yml up -d tracker_app
+./scripts/restore-db.sh prod /opt/lstracker/backups/prod/lstracker-prod-PRE-UPGRADE.sql.gz
 ```
 
 ---
 
 ## Checklist condensée
 
-### Provisioning (1 fois)
+### Préparation (1 fois)
 
-- [ ] Docker + Compose plugin installés
-- [ ] Firewall configuré (ports 9200, 9201, SSH only)
-- [ ] `docker login ghcr.io` réussi
-- [ ] Repo cloné dans `/opt/lstracker`
-- [ ] Dossiers `logs/`, `backups/` créés
+- [ ] Docker installé et fonctionnel
+- [ ] Accès SSH au serveur
 
-### Phase 1 — DEMO
+### À chaque déploiement initial
 
-- [ ] `.env.demo` rempli, **aucun CHANGE_ME restant**
-- [ ] `chmod 600 .env.demo`
-- [ ] `APP_IMAGE` pointe vers un tag existant sur ghcr.io
-- [ ] `docker compose ... up -d` réussi
-- [ ] Logs DB et app sans erreur
+- [ ] Bundle téléchargé depuis la Release voulue
+- [ ] Checksum SHA256 vérifié
+- [ ] `.env.demo` rempli, **aucun CHANGE_ME**, `chmod 600`
+- [ ] `docker compose up -d` réussi, 2 containers UP
 - [ ] `/actuator/health` retourne UP
+- [ ] Login + navigation fonctionnels
 
-### Phase 2 — Validation DEMO (48-72h min)
+### Avant de passer en PROD
 
-- [ ] Login + navigation principale OK
-- [ ] Création/lecture/modification d'échantillon
-- [ ] Rapports Jasper OK
-- [ ] Postgres pas exposé publiquement (nmap)
-- [ ] Pas d'erreurs récurrentes dans `docker logs`
-- [ ] Mémoire stable (pas de leak)
-
-### Phase 3 — PROD
-
-- [ ] `.env.prod` rempli avec secrets **différents** de demo
+- [ ] DEMO observée 48-72h sans erreur
+- [ ] `.env.prod` avec secrets **différents** de demo
 - [ ] DB name + user **différents** de demo
-- [ ] `chmod 600 .env.prod`
-- [ ] `docker compose ... up -d` réussi
-- [ ] `/actuator/health` UP
 - [ ] (Si migration) dump importé, count records OK
+- [ ] nginx + HTTPS configurés (cf. NGINX.md)
 
-### Phase 4 — Post-PROD
+### Post-PROD
 
-- [ ] Smoke test fonctionnel
 - [ ] Backup cron quotidien actif
-- [ ] Monitoring externe configuré
+- [ ] Monitoring externe (uptime)
 - [ ] URL communiquée aux users
