@@ -52,6 +52,18 @@ if [[ "$CONFIRM" != "restore $ENV_NAME" ]]; then
   exit 1
 fi
 
+# Drop existing schemas before restore — pg_dump par défaut ne met pas
+# IF NOT EXISTS sur CREATE SCHEMA, donc si la DB cible a déjà été initialisée
+# (init_db.sql au premier démarrage du container), le restore plante avec
+# "schema sample_tracker already exists".
+echo "Dropping existing schemas (sample_tracker + public)..."
+docker exec -e PGPASSWORD="$POSTGRES_PASSWORD" "$DB_CONTAINER" \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  --quiet --set ON_ERROR_STOP=1 \
+  -c "DROP SCHEMA IF EXISTS sample_tracker CASCADE;" \
+  -c "DROP SCHEMA IF EXISTS public CASCADE;" \
+  -c "CREATE SCHEMA public;"
+
 echo "Restoring..."
 gunzip -c "$BACKUP_FILE" | \
   docker exec -i -e PGPASSWORD="$POSTGRES_PASSWORD" "$DB_CONTAINER" \
@@ -59,4 +71,4 @@ gunzip -c "$BACKUP_FILE" | \
     --quiet --single-transaction --set ON_ERROR_STOP=1
 
 echo "Done. Restart the app to refresh any cached state:"
-echo "  docker compose --env-file $ENV_FILE -f docker-compose.${ENV_NAME}.yml up -d tracker_app"
+echo "  docker compose --env-file $ENV_FILE -f docker-compose.${ENV_NAME}.yml restart tracker_app"
