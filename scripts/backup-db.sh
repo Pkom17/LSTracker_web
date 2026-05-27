@@ -25,7 +25,9 @@ fi
 
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 BACKUP_ROOT="${BACKUP_ROOT:-/opt/lstracker/backups}"
-APP_ROOT="${APP_ROOT:-/opt/lstracker}"
+# APP_ROOT = dossier contenant .env.<env> et docker-compose.<env>.yml.
+# Défaut "." = CWD (cas typique : on lance depuis le dossier du bundle extrait).
+APP_ROOT="${APP_ROOT:-.}"
 
 DB_CONTAINER="lst_${ENV_NAME}_db"
 ENV_FILE="${APP_ROOT}/.env.${ENV_NAME}"

@@ -19,7 +19,10 @@ if [[ "$ENV_NAME" != "demo" && "$ENV_NAME" != "prod" ]] || [[ -z "$BACKUP_FILE" 
 fi
 [[ -f "$BACKUP_FILE" ]] || { echo "ERROR: $BACKUP_FILE not found" >&2; exit 1; }
 
-APP_ROOT="${APP_ROOT:-/opt/lstracker}"
+# APP_ROOT = dossier contenant .env.<env> et docker-compose.<env>.yml.
+# Défaut "." = CWD (cas typique : on lance depuis le dossier du bundle extrait).
+# Override si besoin : APP_ROOT=/chemin/autre ./scripts/restore-db.sh ...
+APP_ROOT="${APP_ROOT:-.}"
 DB_CONTAINER="lst_${ENV_NAME}_db"
 ENV_FILE="${APP_ROOT}/.env.${ENV_NAME}"
 
