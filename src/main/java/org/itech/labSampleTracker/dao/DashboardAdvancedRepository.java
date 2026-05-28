@@ -147,7 +147,7 @@ public class DashboardAdvancedRepository {
 	 * even with zero samples — useful for a "you've got nothing here" honest UI).
 	 */
 	public List<Map<String, Object>> statsByRegion(LocalDate startDate, LocalDate endDate,
-			List<Integer> accessibleSiteIds) {
+			Integer labId, List<Integer> accessibleSiteIds) {
 		final String sql = "SELECT reg.id AS region_id, reg.name AS region, "
 				+ "  COUNT(s.id) AS total, "
 				+ "  SUM(CASE WHEN ss.status = 'ON_TRANSIT' THEN 1 ELSE 0 END) AS in_transit, "
@@ -161,14 +161,19 @@ public class DashboardAdvancedRepository {
 				+ "LEFT JOIN district d ON d.region_id = reg.id "
 				+ "LEFT JOIN site st ON st.district_id = d.id "
 				+ "LEFT JOIN sample_retrieving sr ON sr.site_id = st.id "
+				// Filtre date ET lab dans le ON du LEFT JOIN : on garde toutes les
+				// régions (total=0 si aucun sample ne matche) plutôt que de les
+				// faire disparaître via le WHERE.
 				+ "LEFT JOIN sample s ON s.sample_retrieving_id = sr.id AND ("
 				+ "    (CAST(:startDate AS DATE) IS NULL OR CAST(s.collection_date AS DATE) >= CAST(:startDate AS DATE)) "
-				+ "AND (CAST(:endDate AS DATE) IS NULL OR CAST(s.collection_date AS DATE) <= CAST(:endDate AS DATE))) "
+				+ "AND (CAST(:endDate AS DATE) IS NULL OR CAST(s.collection_date AS DATE) <= CAST(:endDate AS DATE)) "
+				+ "AND (CAST(:labId AS INT) IS NULL OR s.destination_lab_id = CAST(:labId AS INT))) "
 				+ "LEFT JOIN sample_status ss ON ss.id = s.sample_status_id "
 				+ "WHERE (:accessibleSiteIdsActive = FALSE OR st.id IS NULL OR st.id IN (:accessibleSiteIds)) "
 				+ "GROUP BY reg.id, reg.name ORDER BY reg.name";
 		MapSqlParameterSource p = new MapSqlParameterSource()
-				.addValue("startDate", startDate).addValue("endDate", endDate);
+				.addValue("startDate", startDate).addValue("endDate", endDate)
+				.addValue("labId", labId);
 		boolean active = accessibleSiteIds != null && !accessibleSiteIds.isEmpty();
 		p.addValue("accessibleSiteIdsActive", active);
 		p.addValue("accessibleSiteIds", active ? accessibleSiteIds : List.of(-1));
@@ -179,7 +184,7 @@ public class DashboardAdvancedRepository {
 	 * Aggregated stats grouped by district within a region.
 	 */
 	public List<Map<String, Object>> statsByDistrict(Integer regionId, LocalDate startDate, LocalDate endDate,
-			List<Integer> accessibleSiteIds) {
+			Integer labId, List<Integer> accessibleSiteIds) {
 		final String sql = "SELECT d.id AS district_id, d.name AS district, "
 				+ "  COUNT(s.id) AS total, "
 				+ "  SUM(CASE WHEN ss.status = 'ON_TRANSIT' THEN 1 ELSE 0 END) AS in_transit, "
@@ -194,14 +199,16 @@ public class DashboardAdvancedRepository {
 				+ "LEFT JOIN sample_retrieving sr ON sr.site_id = st.id "
 				+ "LEFT JOIN sample s ON s.sample_retrieving_id = sr.id AND ("
 				+ "    (CAST(:startDate AS DATE) IS NULL OR CAST(s.collection_date AS DATE) >= CAST(:startDate AS DATE)) "
-				+ "AND (CAST(:endDate AS DATE) IS NULL OR CAST(s.collection_date AS DATE) <= CAST(:endDate AS DATE))) "
+				+ "AND (CAST(:endDate AS DATE) IS NULL OR CAST(s.collection_date AS DATE) <= CAST(:endDate AS DATE)) "
+				+ "AND (CAST(:labId AS INT) IS NULL OR s.destination_lab_id = CAST(:labId AS INT))) "
 				+ "LEFT JOIN sample_status ss ON ss.id = s.sample_status_id "
 				+ "WHERE d.region_id = :regionId "
 				+ "AND (:accessibleSiteIdsActive = FALSE OR st.id IS NULL OR st.id IN (:accessibleSiteIds)) "
 				+ "GROUP BY d.id, d.name ORDER BY d.name";
 		MapSqlParameterSource p = new MapSqlParameterSource()
 				.addValue("regionId", regionId)
-				.addValue("startDate", startDate).addValue("endDate", endDate);
+				.addValue("startDate", startDate).addValue("endDate", endDate)
+				.addValue("labId", labId);
 		boolean active = accessibleSiteIds != null && !accessibleSiteIds.isEmpty();
 		p.addValue("accessibleSiteIdsActive", active);
 		p.addValue("accessibleSiteIds", active ? accessibleSiteIds : List.of(-1));
@@ -212,7 +219,7 @@ public class DashboardAdvancedRepository {
 	 * Aggregated stats grouped by site within a district.
 	 */
 	public List<Map<String, Object>> statsBySite(Integer districtId, LocalDate startDate, LocalDate endDate,
-			List<Integer> accessibleSiteIds) {
+			Integer labId, List<Integer> accessibleSiteIds) {
 		final String sql = "SELECT st.id AS site_id, st.name AS site, "
 				+ "  COUNT(s.id) AS total, "
 				+ "  SUM(CASE WHEN ss.status = 'ON_TRANSIT' THEN 1 ELSE 0 END) AS in_transit, "
@@ -226,14 +233,16 @@ public class DashboardAdvancedRepository {
 				+ "LEFT JOIN sample_retrieving sr ON sr.site_id = st.id "
 				+ "LEFT JOIN sample s ON s.sample_retrieving_id = sr.id AND ("
 				+ "    (CAST(:startDate AS DATE) IS NULL OR CAST(s.collection_date AS DATE) >= CAST(:startDate AS DATE)) "
-				+ "AND (CAST(:endDate AS DATE) IS NULL OR CAST(s.collection_date AS DATE) <= CAST(:endDate AS DATE))) "
+				+ "AND (CAST(:endDate AS DATE) IS NULL OR CAST(s.collection_date AS DATE) <= CAST(:endDate AS DATE)) "
+				+ "AND (CAST(:labId AS INT) IS NULL OR s.destination_lab_id = CAST(:labId AS INT))) "
 				+ "LEFT JOIN sample_status ss ON ss.id = s.sample_status_id "
 				+ "WHERE st.district_id = :districtId "
 				+ "AND (:accessibleSiteIdsActive = FALSE OR st.id IN (:accessibleSiteIds)) "
 				+ "GROUP BY st.id, st.name ORDER BY st.name";
 		MapSqlParameterSource p = new MapSqlParameterSource()
 				.addValue("districtId", districtId)
-				.addValue("startDate", startDate).addValue("endDate", endDate);
+				.addValue("startDate", startDate).addValue("endDate", endDate)
+				.addValue("labId", labId);
 		boolean active = accessibleSiteIds != null && !accessibleSiteIds.isEmpty();
 		p.addValue("accessibleSiteIdsActive", active);
 		p.addValue("accessibleSiteIds", active ? accessibleSiteIds : List.of(-1));

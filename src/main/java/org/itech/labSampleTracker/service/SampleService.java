@@ -110,6 +110,6 @@ public interface SampleService {
 	Map<String, Map<String, Integer>> getSampleStatusBySampleType();
 
 	Map<String, Map<String, Integer>> getSampleStatusBySampleType(Integer regionId, Integer districtId, Integer siteId,
-			LocalDate startDate, LocalDate endDate);
+			Integer labId, LocalDate startDate, LocalDate endDate, List<Integer> accessibleSiteIds);
 
 }

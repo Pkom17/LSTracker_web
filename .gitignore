@@ -6,9 +6,10 @@ target/
 
 ### Secrets (never commit) ###
 .env
-.env.local
-.env.prod
-.env.demo
+.env.*
+!.env.example
+!.env.demo.example
+!.env.prod.example
 *.local.properties
 
 ### STS ###

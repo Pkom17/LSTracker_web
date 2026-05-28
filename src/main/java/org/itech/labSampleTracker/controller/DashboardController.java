@@ -158,7 +158,8 @@ public class DashboardController {
 			sampleCount = java.util.Collections.emptyMap();
 		} else {
 			sampleCount = sampleService.getSampleStatusBySampleType(scopeByType.getRegionId(),
-					scopeByType.getDistrictId(), scopeByType.getSiteId(), startDate, endDate);
+					scopeByType.getDistrictId(), scopeByType.getSiteId(), scopeByType.getLabId(),
+					startDate, endDate, scopeByType.getAccessibleSiteIds());
 		}
 		Set<String> categories = sampleCount.keySet();
 		List<Integer> collected = new ArrayList<Integer>();
@@ -200,9 +201,10 @@ public class DashboardController {
 	public Map<String, Object> series(
 			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
 			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
-			@RequestParam(required = false) Integer regionId, @RequestParam(required = false) Integer districtId,
-			@RequestParam(required = false) Integer siteId,
-			@RequestParam(required = false, defaultValue = "0") Integer labId) {
+			@RequestParam(name = "region", required = false) Integer regionId,
+			@RequestParam(name = "district", required = false) Integer districtId,
+			@RequestParam(name = "site", required = false) Integer siteId,
+			@RequestParam(name = "lab", required = false) Integer labId) {
 
 		if (startDate == null)
 			startDate = LocalDate.now().minusYears(2);
@@ -235,9 +237,10 @@ public class DashboardController {
 	public List<StepDurationDTO> stepDurations(
 			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
 			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
-			@RequestParam(required = false) Integer regionId, @RequestParam(required = false) Integer districtId,
-			@RequestParam(required = false) Integer siteId,
-			@RequestParam(required = false) Integer labId) {
+			@RequestParam(name = "region", required = false) Integer regionId,
+			@RequestParam(name = "district", required = false) Integer districtId,
+			@RequestParam(name = "site", required = false) Integer siteId,
+			@RequestParam(name = "lab", required = false) Integer labId) {
 		if (startDate == null)
 			startDate = LocalDate.now().minusYears(2);
 		if (endDate == null)
@@ -331,12 +334,13 @@ public class DashboardController {
 	@ResponseBody
 	public List<Map<String, Object>> statsByRegion(
 			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
-			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate) {
+			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+			@RequestParam(name = "lab", required = false) Integer labId) {
 		if (startDate == null) startDate = LocalDate.now().minusYears(2);
 		if (endDate == null) endDate = LocalDate.now();
-		ScopedFilter scope = userScopeService.intersectCurrent(null, null, null, null);
+		ScopedFilter scope = userScopeService.intersectCurrent(null, null, null, labId);
 		if (scope.isForceEmpty()) return java.util.List.of();
-		return advancedRepo.statsByRegion(startDate, endDate, scope.getAccessibleSiteIds());
+		return advancedRepo.statsByRegion(startDate, endDate, scope.getLabId(), scope.getAccessibleSiteIds());
 	}
 
 	@GetMapping(value = "/data/by-district", produces = "application/json")
@@ -344,12 +348,13 @@ public class DashboardController {
 	public List<Map<String, Object>> statsByDistrict(
 			@RequestParam("region") Integer regionId,
 			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
-			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate) {
+			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+			@RequestParam(name = "lab", required = false) Integer labId) {
 		if (startDate == null) startDate = LocalDate.now().minusYears(2);
 		if (endDate == null) endDate = LocalDate.now();
-		ScopedFilter scope = userScopeService.intersectCurrent(regionId, null, null, null);
+		ScopedFilter scope = userScopeService.intersectCurrent(regionId, null, null, labId);
 		if (scope.isForceEmpty()) return java.util.List.of();
-		return advancedRepo.statsByDistrict(regionId, startDate, endDate, scope.getAccessibleSiteIds());
+		return advancedRepo.statsByDistrict(regionId, startDate, endDate, scope.getLabId(), scope.getAccessibleSiteIds());
 	}
 
 	@GetMapping(value = "/data/by-site", produces = "application/json")
@@ -357,12 +362,13 @@ public class DashboardController {
 	public List<Map<String, Object>> statsBySite(
 			@RequestParam("district") Integer districtId,
 			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
-			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate) {
+			@RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+			@RequestParam(name = "lab", required = false) Integer labId) {
 		if (startDate == null) startDate = LocalDate.now().minusYears(2);
 		if (endDate == null) endDate = LocalDate.now();
-		ScopedFilter scope = userScopeService.intersectCurrent(null, districtId, null, null);
+		ScopedFilter scope = userScopeService.intersectCurrent(null, districtId, null, labId);
 		if (scope.isForceEmpty()) return java.util.List.of();
-		return advancedRepo.statsBySite(districtId, startDate, endDate, scope.getAccessibleSiteIds());
+		return advancedRepo.statsBySite(districtId, startDate, endDate, scope.getLabId(), scope.getAccessibleSiteIds());
 	}
 
 	/**

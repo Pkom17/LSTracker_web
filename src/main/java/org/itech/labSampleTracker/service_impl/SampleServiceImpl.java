@@ -750,7 +750,7 @@ public class SampleServiceImpl implements SampleService {
 
 	@Override
 	public Map<String, Map<String, Integer>> getSampleStatusBySampleType(Integer regionId, Integer districtId,
-			Integer siteId, LocalDate startDate, LocalDate endDate) {
+			Integer siteId, Integer labId, LocalDate startDate, LocalDate endDate, List<Integer> accessibleSiteIds) {
 		// REFONTE complète (audit rapports) : on n'agrège plus par ss.status
 		// (qui est ÉCRASÉ à chaque transition) mais directement par dates
 		// persistantes via SUM(CASE WHEN date IS NOT NULL). Garantit que
@@ -780,6 +780,14 @@ public class SampleServiceImpl implements SampleService {
 			sql.append(" AND d.id = :districtId ");
 		if (ObjectUtils.isNotEmpty(siteId))
 			sql.append(" AND site.id = :siteId ");
+		if (ObjectUtils.isNotEmpty(labId))
+			sql.append(" AND s.destination_lab_id = :labId ");
+		// Scope user (non-admin) : restreint aux sites accessibles. Liste non
+		// vide ⇒ on applique le IN ; admin / global ⇒ accessibleSiteIds null
+		// ou vide, pas de filtre.
+		boolean scopeActive = accessibleSiteIds != null && !accessibleSiteIds.isEmpty();
+		if (scopeActive)
+			sql.append(" AND site.id IN (:accessibleSiteIds) ");
 		// CAST AS DATE plutôt que ::date : Hibernate parse `::` comme un
 		// paramètre nommé via em.createNativeQuery et casse la syntaxe.
 		sql.append(" AND (CAST(s.collection_date AS DATE) BETWEEN :startDate AND :endDate) ");
@@ -809,6 +817,10 @@ public class SampleServiceImpl implements SampleService {
 				query.setParameter("districtId", districtId);
 			if (ObjectUtils.isNotEmpty(siteId))
 				query.setParameter("siteId", siteId);
+			if (ObjectUtils.isNotEmpty(labId))
+				query.setParameter("labId", labId);
+			if (scopeActive)
+				query.setParameter("accessibleSiteIds", accessibleSiteIds);
 			query.setParameter("startDate", startDate);
 			query.setParameter("endDate", endDate);
 			@SuppressWarnings("unchecked")
@@ -832,8 +844,8 @@ public class SampleServiceImpl implements SampleService {
 				map.put("FAILED", toIntSafe(o[8]));
 			}
 		} catch (Exception ex) {
-			log.error("getSampleStatusBySampleType failed (regionId={}, districtId={}, siteId={}, startDate={}, endDate={}): {}",
-					regionId, districtId, siteId, startDate, endDate, ex.getMessage(), ex);
+			log.error("getSampleStatusBySampleType failed (regionId={}, districtId={}, siteId={}, labId={}, startDate={}, endDate={}): {}",
+					regionId, districtId, siteId, labId, startDate, endDate, ex.getMessage(), ex);
 		}
 		return response;
 	}

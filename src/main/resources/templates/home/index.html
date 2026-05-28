@@ -1135,7 +1135,7 @@
 
 	function loadDrillRegions() {
 		const f = currentFilters();
-		$.get('dashboard/data/by-region', { startDate: f.startDate, endDate: f.endDate }, function(rows) {
+		$.get('dashboard/data/by-region', { startDate: f.startDate, endDate: f.endDate, lab: f.lab }, function(rows) {
 			window._drillRegions = rows || [];
 			renderDrillRegions();
 		});
@@ -1205,7 +1205,8 @@
 			: 'dashboard/data/by-site?district=' + id;
 		const startDate = f.startDate ? '&startDate=' + f.startDate : '';
 		const endDate = f.endDate ? '&endDate=' + f.endDate : '';
-		$.get(url + startDate + endDate, function(rows) {
+		const lab = f.lab ? '&lab=' + f.lab : '';
+		$.get(url + startDate + endDate + lab, function(rows) {
 			$btn.text('▼');
 			const showEmpty = $('#showEmptyZones').is(':checked');
 			const totalRowsRaw = rows.length;
