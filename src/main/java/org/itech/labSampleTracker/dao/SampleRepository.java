@@ -64,6 +64,53 @@ public interface SampleRepository extends JpaRepository<Sample, Integer>, JpaSpe
 			@Param("accessibleSiteIds") List<Integer> accessibleSiteIds,
 			@Param("hasExtraSites") Boolean hasExtraSites);
 
+	/**
+	 * Échantillons éligibles à la synchronisation oedatarepo : un labNumber est
+	 * renseigné, et le statut courant n'est PAS terminal (résultat déjà
+	 * obtenu/échoué ou cycle de résultat entamé). On interroge donc oedatarepo
+	 * pour ceux qui sont au labo en attente de résultat.
+	 * Filtre sur le CODE du statut (sample_status.status) pour ne pas dépendre
+	 * d'ids. Limité pour borner la charge d'un passage de job.
+	 * Exclut les labno épuisés (attempts >= maxAttempts ET dernier résultat
+	 * NOT_FOUND), réintroduits seulement par un reset admin ou un résultat
+	 * exploitable ultérieur.
+	 */
+	@Query(value = "SELECT s.* FROM sample s "
+			+ "JOIN sample_status ss ON ss.id = s.sample_status_id "
+			+ "LEFT JOIN oedatarepo_sample_sync oss ON oss.sample_id = s.id "
+			+ "WHERE s.lab_number IS NOT NULL AND TRIM(s.lab_number) <> '' "
+			+ "AND ss.status NOT IN ("
+			+ "  'ANALYSIS_DONE','NON_CONFORM','ANALYSIS_FAILED','RESULT_COLLECTED','RESULT_ON_SITE') "
+			+ "AND NOT (COALESCE(oss.attempts, 0) >= :maxAttempts AND oss.last_outcome = 'NOT_FOUND') "
+			+ "ORDER BY s.lastupdated_at ASC LIMIT :maxRows", nativeQuery = true)
+	List<Sample> findEligibleForAnalysisSync(@Param("maxRows") int maxRows,
+			@Param("maxAttempts") int maxAttempts);
+
+	/**
+	 * Liste paginée des échantillons éligibles (même filtre de statut/labno que
+	 * {@link #findEligibleForAnalysisSync}) décorée de leur état de suivi
+	 * oedatarepo, MAIS sans exclure les épuisés (pour les afficher et permettre
+	 * un reset depuis la page admin). Filtre optionnel sur le labno.
+	 */
+	@Query(value = "SELECT s.id, s.lab_number, ss.status AS status_code, ss.description AS status_desc, "
+			+ "s.analysis_completed_date, s.analysis_released_date, s.lastupdated_at, "
+			+ "COALESCE(oss.attempts, 0) AS attempts, oss.last_outcome, oss.last_at "
+			+ "FROM sample s "
+			+ "JOIN sample_status ss ON ss.id = s.sample_status_id "
+			+ "LEFT JOIN oedatarepo_sample_sync oss ON oss.sample_id = s.id "
+			+ "WHERE s.lab_number IS NOT NULL AND TRIM(s.lab_number) <> '' "
+			+ "AND ss.status NOT IN ("
+			+ "  'ANALYSIS_DONE','NON_CONFORM','ANALYSIS_FAILED','RESULT_COLLECTED','RESULT_ON_SITE') "
+			+ "AND (:searchText IS NULL OR s.lab_number ILIKE CONCAT('%', CAST(:searchText AS TEXT), '%')) ",
+			countQuery = "SELECT COUNT(s.id) FROM sample s "
+					+ "JOIN sample_status ss ON ss.id = s.sample_status_id "
+					+ "WHERE s.lab_number IS NOT NULL AND TRIM(s.lab_number) <> '' "
+					+ "AND ss.status NOT IN ("
+					+ "  'ANALYSIS_DONE','NON_CONFORM','ANALYSIS_FAILED','RESULT_COLLECTED','RESULT_ON_SITE') "
+					+ "AND (:searchText IS NULL OR s.lab_number ILIKE CONCAT('%', CAST(:searchText AS TEXT), '%'))",
+			nativeQuery = true)
+	Page<Map<String, Object>> findEligibleWithSyncMeta(Pageable pageable, @Param("searchText") String searchText);
+
 	@Query(value = "SELECT s.id, reg.name AS region, d.name AS district, site.name AS site, "
 			+ "st.name AS sample_type, s.sample_identifier, s.patient_identifier, "
 			+ "s.collection_date, destination_lab.lab_name AS destination_lab, "

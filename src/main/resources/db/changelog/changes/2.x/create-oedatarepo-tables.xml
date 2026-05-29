@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd
+    http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+	<!--
+		Intégration oedatarepo : suivi de synchronisation.
+		- oedatarepo_sample_sync : 1 ligne par échantillon, compteur de tentatives
+		  (NOT_FOUND) + dernier résultat, pilote l'exclusion des labno absents.
+		- oedatarepo_sync_run     : historique des exécutions (job planifié ou manuel).
+	-->
+
+	<changeSet id="001-create-oedatarepo-sample-sync" author="pkomena">
+		<createTable tableName="oedatarepo_sample_sync">
+			<column name="id" type="BIGINT" autoIncrement="true">
+				<constraints primaryKey="true"
+					primaryKeyName="pk_oe_sample_sync" />
+			</column>
+			<column name="sample_id" type="INT">
+				<constraints nullable="false" />
+			</column>
+			<column name="attempts" type="INT" defaultValueNumeric="0">
+				<constraints nullable="false" />
+			</column>
+			<column name="last_at" type="TIMESTAMP" />
+			<column name="last_outcome" type="VARCHAR(20)" />
+			<column name="last_error" type="VARCHAR(500)" />
+		</createTable>
+
+		<addUniqueConstraint tableName="oedatarepo_sample_sync"
+			columnNames="sample_id" constraintName="uk_oe_sync_sample" />
+
+		<addForeignKeyConstraint
+			baseTableName="oedatarepo_sample_sync" baseColumnNames="sample_id"
+			referencedTableName="sample" referencedColumnNames="id"
+			constraintName="fk_oe_sync_sample" onDelete="CASCADE" />
+
+		<rollback>
+			<dropTable tableName="oedatarepo_sample_sync" />
+		</rollback>
+	</changeSet>
+
+	<changeSet id="002-create-oedatarepo-sync-run" author="pkomena">
+		<createTable tableName="oedatarepo_sync_run">
+			<column name="id" type="BIGINT" autoIncrement="true">
+				<constraints primaryKey="true"
+					primaryKeyName="pk_oe_sync_run" />
+			</column>
+			<column name="started_at" type="TIMESTAMP">
+				<constraints nullable="false" />
+			</column>
+			<column name="finished_at" type="TIMESTAMP" />
+			<column name="triggered_by" type="VARCHAR(32)">
+				<constraints nullable="false" />
+			</column>
+			<column name="examined" type="INT" defaultValueNumeric="0" />
+			<column name="updated" type="INT" defaultValueNumeric="0" />
+			<column name="errors" type="INT" defaultValueNumeric="0" />
+			<column name="duration_ms" type="BIGINT" />
+		</createTable>
+
+		<createIndex tableName="oedatarepo_sync_run"
+			indexName="idx_oe_run_started">
+			<column name="started_at" />
+		</createIndex>
+
+		<rollback>
+			<dropTable tableName="oedatarepo_sync_run" />
+		</rollback>
+	</changeSet>
+
+</databaseChangeLog>
