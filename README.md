@@ -58,6 +58,7 @@ Workflow : [.github/workflows/release.yml](.github/workflows/release.yml)
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | Backups, restauration, mise à jour, rotation secrets, troubleshooting |
 | [scripts/](scripts/) | `backup-db.sh`, `restore-db.sh`, `rotate-secrets.sh`, `check-cert-expiry.sh` |
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | Workflow PR depuis un fork, branch protection, conventions commit |
+| [docs/INTEGRATION_OEDATAREPO.md](docs/INTEGRATION_OEDATAREPO.md) | Intégration OpenELIS consolidé : statut/dates d'analyse par labNumber |
 
 ---
 

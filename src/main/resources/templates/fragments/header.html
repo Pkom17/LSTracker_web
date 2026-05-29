@@ -329,6 +329,7 @@
 						or ${module}=='region' or ${module}=='district'
 						or ${module}=='sampletype' or ${module}=='samplestatus' or ${module}=='samplerejectiontype'
 						or ${module}=='approle' or ${module}=='convoyeur'
+						or ${module}=='oedatarepo'
 						? ' active' : ''"
 					href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"
 					onclick="return false;">
@@ -346,6 +347,9 @@
 					<li><h6 class="dropdown-header"><i class="fas fa-flask"></i> Laboratoires &amp; circuits</h6></li>
 					<li><a class="dropdown-item" th:href="@{/lab}"><i class="fas fa-flask"></i> Laboratoires</a></li>
 					<li><a class="dropdown-item" th:href="@{/circuit}"><i class="fas fa-route"></i> Circuits</a></li>
+					<li><hr class="dropdown-divider"/></li>
+					<li><h6 class="dropdown-header"><i class="fas fa-plug"></i> Interopérabilité</h6></li>
+					<li><a class="dropdown-item" th:href="@{/sync-openelis}"><i class="fas fa-sync"></i> Suivi Synchro. OpenELIS</a></li>
 				</ul>
 			</li>
 

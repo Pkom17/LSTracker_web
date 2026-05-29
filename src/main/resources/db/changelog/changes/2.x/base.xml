@@ -16,6 +16,8 @@
 		relativeToChangelogFile="true" />
 	<include file="./fix_sequences_after_loaddata.xml"
 		relativeToChangelogFile="true" />
+	<include file="./create-oedatarepo-tables.xml"
+		relativeToChangelogFile="true" />
 
 
 
