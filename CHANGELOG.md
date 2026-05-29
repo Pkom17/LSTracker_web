@@ -1,5 +1,29 @@
 # Changelog — LabSampleTracker (web + backend)
 
+## 2026-05-29 — Intégration OpenELIS consolidé (oedatarepo) + page de suivi
+
+### Intégration OpenELIS (récupération statut/dates d'analyse)
+
+- **Synchronisation par `labNumber`** : LSTracker interroge le serveur OpenELIS consolidé (`oedatarepo`) pour récupérer le statut consolidé et les dates d'analyse d'un échantillon, et applique le mapping `RESULT_READY → ANALYSIS_DONE`, `ANALYSIS_FAILED`, `NON_CONFORM` (+ dates `analysis_completed_date` / `analysis_released_date`). Client JWT avec cache/renouvellement de token et retry sur 401.
+- **Trois déclenchements** partageant la même logique de lot (`OeAnalysisBatchService`, avec garde de concurrence) : job planifié (`@Scheduled`, 30 min par défaut), refresh ciblé, et page d'administration.
+- **Compteur de tentatives + épuisement** : un `labNumber` absent d'oedatarepo (404) est ré-essayé jusqu'à `OEDATAREPO_MAX_ATTEMPTS` (5) puis exclu des passages automatiques, réintroduit par un *reset* admin. Un labno présent mais en cours (`PENDING`) ou résolu (`UPDATED`) remet le compteur à zéro (auto-guérison).
+
+### Page d'administration `/sync-openelis` (ADMIN / SUPER_ADMIN)
+
+- *Administration → Interopérabilité → Suivi Synchro. OpenELIS*. Trois panneaux : **état** de l'intégration (connexion, dernier/prochain passage, config) avec bouton « Lancer maintenant » ; **liste des éligibles** avec prévisualisation à la demande (sans persister), refresh et reset par ligne, marqueur d'épuisement ; **historique** des exécutions.
+
+### Robustesse
+
+- `labNumber` non interrogeable (contient `/`, `\`, `?`, `#`, `%`) classé `NOT_FOUND` sans appel réseau — évite les `400 Bad Request` Tomcat sur slash encodé.
+- Messages d'erreur HTTP tronqués (plus de corps HTML brut dans les logs ni l'UI).
+- Pages d'erreur **404 / générique** personnalisées (`templates/error/`).
+
+### Schéma & configuration
+
+- Nouvelles tables `oedatarepo_sample_sync` (suivi par échantillon) et `oedatarepo_sync_run` (historique) — changeset Liquibase dédié.
+- Variables `OEDATAREPO_ENABLED/URL/USER/PASSWORD` + réglages `OEDATAREPO_BATCH_SIZE/INTERVAL_MS/MAX_ATTEMPTS`. Désactivé par défaut.
+- Documentation : [docs/INTEGRATION_OEDATAREPO.md](docs/INTEGRATION_OEDATAREPO.md).
+
 ## 2026-05-25 — Audit cohérence + refonte UI dashboard + rapports
 
 ### Sécurité
