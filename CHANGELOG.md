@@ -1,6 +1,6 @@
 # Changelog — LabSampleTracker (web + backend)
 
-## 2026-05-29 — Intégration OpenELIS consolidé (oedatarepo) + page de suivi
+## 2026-05-29 — Intégration OpenELIS consolidé (oedatarepo) + page de suivi (v2.2.2)
 
 ### Intégration OpenELIS (récupération statut/dates d'analyse)
 
