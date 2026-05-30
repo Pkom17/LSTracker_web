@@ -65,15 +65,22 @@ public interface SampleRepository extends JpaRepository<Sample, Integer>, JpaSpe
 			@Param("hasExtraSites") Boolean hasExtraSites);
 
 	/**
-	 * Échantillons éligibles à la synchronisation oedatarepo : un labNumber est
-	 * renseigné, et le statut courant n'est PAS terminal (résultat déjà
-	 * obtenu/échoué ou cycle de résultat entamé). On interroge donc oedatarepo
-	 * pour ceux qui sont au labo en attente de résultat.
+	 * Une VAGUE d'échantillons éligibles à la synchronisation oedatarepo : un
+	 * labNumber est renseigné, et le statut courant n'est PAS terminal (résultat
+	 * déjà obtenu/échoué ou cycle de résultat entamé).
 	 * Filtre sur le CODE du statut (sample_status.status) pour ne pas dépendre
-	 * d'ids. Limité pour borner la charge d'un passage de job.
-	 * Exclut les labno épuisés (attempts >= maxAttempts ET dernier résultat
-	 * NOT_FOUND), réintroduits seulement par un reset admin ou un résultat
-	 * exploitable ultérieur.
+	 * d'ids. Exclut les labno épuisés (attempts >= maxAttempts ET dernier
+	 * résultat NOT_FOUND), réintroduits seulement par un reset admin ou un
+	 * résultat exploitable ultérieur.
+	 *
+	 * Tri = CURSEUR DE VAGUE : par date du dernier check (oedatarepo_sample_sync.
+	 * last_at) ASC NULLS FIRST → les jamais-checkés d'abord, puis les checkés il y
+	 * a le plus longtemps. Comme {@code recordOutcome} met last_at=now() après
+	 * chaque check, un échantillon traité passe en fin de file ; la vague suivante
+	 * (même requête, même LIMIT) ramène les suivants. C'est ce qui permet à un
+	 * cycle de couvrir TOUS les éligibles par vagues successives (cf.
+	 * {@code OeAnalysisBatchService.runBatch}). {@code s.id} = tie-breaker
+	 * déterministe en cas de last_at égaux.
 	 */
 	@Query(value = "SELECT s.* FROM sample s "
 			+ "JOIN sample_status ss ON ss.id = s.sample_status_id "
@@ -82,7 +89,7 @@ public interface SampleRepository extends JpaRepository<Sample, Integer>, JpaSpe
 			+ "AND ss.status NOT IN ("
 			+ "  'ANALYSIS_DONE','NON_CONFORM','ANALYSIS_FAILED','RESULT_COLLECTED','RESULT_ON_SITE') "
 			+ "AND NOT (COALESCE(oss.attempts, 0) >= :maxAttempts AND oss.last_outcome = 'NOT_FOUND') "
-			+ "ORDER BY s.lastupdated_at ASC LIMIT :maxRows", nativeQuery = true)
+			+ "ORDER BY oss.last_at ASC NULLS FIRST, s.id ASC LIMIT :maxRows", nativeQuery = true)
 	List<Sample> findEligibleForAnalysisSync(@Param("maxRows") int maxRows,
 			@Param("maxAttempts") int maxAttempts);
 

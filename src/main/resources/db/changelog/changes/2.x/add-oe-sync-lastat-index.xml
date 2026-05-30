@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd
+    http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+	<!--
+		Index sur oedatarepo_sample_sync.last_at : accélère le tri
+		"ORDER BY last_at ASC NULLS FIRST" du curseur de vague utilisé par le job
+		de synchronisation (cf. SampleRepository.findEligibleForAnalysisSync).
+		Créé en SQL natif pour pouvoir exprimer NULLS FIRST (non gérable via
+		<createIndex>).
+	-->
+	<changeSet id="003-oe-sync-lastat-index" author="pkomena">
+		<sql>CREATE INDEX IF NOT EXISTS idx_oe_sync_last_at
+			ON oedatarepo_sample_sync (last_at ASC NULLS FIRST);</sql>
+		<rollback>
+			<sql>DROP INDEX IF EXISTS idx_oe_sync_last_at;</sql>
+		</rollback>
+	</changeSet>
+
+</databaseChangeLog>

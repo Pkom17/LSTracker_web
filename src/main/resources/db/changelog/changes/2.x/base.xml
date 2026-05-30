@@ -18,6 +18,8 @@
 		relativeToChangelogFile="true" />
 	<include file="./create-oedatarepo-tables.xml"
 		relativeToChangelogFile="true" />
+	<include file="./add-oe-sync-lastat-index.xml"
+		relativeToChangelogFile="true" />
 
 
 

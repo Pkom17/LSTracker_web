@@ -1,6 +1,8 @@
 package org.itech.labSampleTracker.integration.oedatarepo;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.itech.labSampleTracker.dao.SampleRepository;
@@ -26,6 +28,9 @@ import lombok.Getter;
 public class OeAnalysisBatchService {
 
     private static final Logger log = LoggerFactory.getLogger(OeAnalysisBatchService.class);
+
+    /** Garde-fou absolu contre une boucle de vagues infinie (ne devrait jamais être atteint). */
+    private static final int MAX_WAVES_PER_CYCLE = 10000;
 
     private final SampleRepository sampleRepository;
     private final OeAnalysisSyncService syncService;
@@ -66,25 +71,57 @@ public class OeAnalysisBatchService {
         int updated = 0;
         int errors = 0;
         try {
-            List<Sample> eligible = sampleRepository.findEligibleForAnalysisSync(batchSize, maxAttempts);
-            examined = eligible.size();
-            for (Sample s : eligible) {
-                try {
-                    OeSyncOutcome outcome = syncService.syncSampleTracked(s);
-                    if (outcome == OeSyncOutcome.UPDATED) {
-                        updated++;
-                    } else if (outcome == OeSyncOutcome.ERROR) {
-                        errors++;
+            // Un cycle couvre TOUS les éligibles par vagues successives. Chaque
+            // vague prend les batchSize éligibles "checkés il y a le plus
+            // longtemps" (curseur last_at, cf. findEligibleForAnalysisSync) ;
+            // recordOutcome avançant leur last_at à now(), ils tombent en fin de
+            // file et la vague suivante prend les suivants.
+            Set<Integer> seen = new HashSet<>();
+            int wave = 0;
+            while (true) {
+                wave++;
+                List<Sample> batch = sampleRepository.findEligibleForAnalysisSync(batchSize, maxAttempts);
+                if (batch.isEmpty()) {
+                    break; // plus aucun éligible → fin du cycle
+                }
+                int fresh = 0;
+                for (Sample s : batch) {
+                    if (!seen.add(s.getId())) {
+                        continue; // déjà traité ce cycle → ne pas re-checker
                     }
-                } catch (Exception e) {
-                    // Un échec sur un échantillon ne doit pas stopper le lot.
-                    errors++;
-                    log.error("Sync oedatarepo échouée pour sample id={} labno={}: {}",
-                            s.getId(), s.getLabNumber(), e.getMessage());
+                    fresh++;
+                    examined++;
+                    try {
+                        OeSyncOutcome outcome = syncService.syncSampleTracked(s);
+                        if (outcome == OeSyncOutcome.UPDATED) {
+                            updated++;
+                        } else if (outcome == OeSyncOutcome.ERROR) {
+                            errors++;
+                        }
+                    } catch (Exception e) {
+                        // Un échec sur un échantillon ne doit pas stopper le cycle.
+                        errors++;
+                        log.error("Sync oedatarepo échouée pour sample id={} labno={}: {}",
+                                s.getId(), s.getLabNumber(), e.getMessage());
+                    }
+                }
+                log.info("Sync oedatarepo ({}) vague {} : {} examiné(s), {} nouveau(x)",
+                        triggeredBy, wave, batch.size(), fresh);
+
+                // Curseur stagnant : la vague n'a ramené que des IDs déjà vus
+                // (ex. samples SKIPPED dont last_at n'avance pas) → fin de cycle.
+                if (fresh == 0) {
+                    break;
+                }
+                // Garde-fou anti-boucle (ne devrait jamais se déclencher).
+                if (wave >= MAX_WAVES_PER_CYCLE) {
+                    log.warn("Sync oedatarepo ({}) : plafond de {} vagues atteint, arrêt de sécurité "
+                            + "({} examinés)", triggeredBy, MAX_WAVES_PER_CYCLE, examined);
+                    break;
                 }
             }
-            log.info("Sync oedatarepo ({}) : {} échantillon(s) examinés, {} mis à jour, {} erreur(s)",
-                    triggeredBy, examined, updated, errors);
+            log.info("Sync oedatarepo ({}) terminée : {} examiné(s), {} mis à jour, {} erreur(s) sur {} vague(s)",
+                    triggeredBy, examined, updated, errors, wave);
             return new RunSummary(false, examined, updated, errors);
         } finally {
             trackingService.finishRun(run, examined, updated, errors);
